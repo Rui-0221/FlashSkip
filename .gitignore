@@ -1,0 +1,7 @@
+.gradle/
+.idea/
+build/
+*/build/
+*.apk
+local.properties
+真机测试日志.txt
