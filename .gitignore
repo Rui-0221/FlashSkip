@@ -5,3 +5,12 @@ build/
 *.apk
 local.properties
 真机测试日志.txt
+
+# Local-only AI agent rules/progress & machine-specific helper scripts
+.agent/
+AGENTS.md
+M1-设计计划.md
+fix-usb-adb-guid.ps1
+watch-and-deploy.ps1
+build.ps1
+verify-on-device.ps1

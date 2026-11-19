@@ -101,23 +101,26 @@ app/ (Android 服务、保活与界面层)
 
 ## 构建、测试与验证
 
-### 1. 运行单元测试与构建 APK
+### 1. 环境要求与命令行构建
 
-- 如在纯英文路径下可直接执行标准 Gradle 命令：
+- **环境要求**：JDK 17、Android SDK（`compileSdk 34` / `buildTools 36.0.0`）、Gradle 8.x（或直接用 Android Studio 打开根目录同步构建）。
+- 使用本地 Gradle 运行全部单元测试并构建 Debug APK：
+
   ```bash
-  ./gradlew :core:test :app:testDebugUnitTest :app:assembleDebug
-  ```
-- 若 Windows 用户名含非 ASCII 字符（如中文路径导致 AGP/Gradle Worker 异常），可使用镜像构建脚本：
-  ```powershell
-  powershell -ExecutionPolicy Bypass -File build.ps1
+  gradle :core:test :app:testDebugUnitTest :app:assembleDebug
   ```
 
-### 2. USB 真机自动化回归验证
+- 生成 APK 默认输出在 `app/build/outputs/apk/debug/app-debug.apk`。若 Windows 用户目录包含非 ASCII 字符导致 Gradle/AGP 路径异常，建议将工程复制到纯英文路径下构建。
 
-连接已开启 USB 调试的 Android 设备后执行：
+### 2. 在设备端进行靶场验证
 
-```powershell
-powershell -ExecutionPolicy Bypass -File verify-on-device.ps1
-```
+安装并在系统“无障碍设置”中开启 **FlashSkip**（Android 13+ 需先在“应用信息 → 右上角菜单”允许受限设置）后，可通过以下任意方式验证全部 8 项对抗场景：
 
-脚本会自动授权受限设置、加入电池白名单、安全追加无障碍服务（保留设备原有已开启的其他服务），并依次运行全部 8 项正/负向靶场验证。
+- **方式 A（应用内点击）**：打开 FlashSkip 主界面，点击「靶场测试 / 多场景选择」，依次体验 5 项正向跳过与 3 项负向防误触对照页；
+- **方式 B（`adb` 命令行拉起指定场景）**：
+
+  ```bash
+  adb shell am start -n com.flashskip/.MainActivity --es launch_scenario standard
+  ```
+
+  可选场景值：`standard`、`non_clickable`、`fullscreen_parent`、`fake_success`、`desc_only`、`neg_guide`、`neg_redpacket`、`neg_center`。
