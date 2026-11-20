@@ -69,7 +69,9 @@ data class WindowSnapshot(
     val screenWidth: Int,
     val screenHeight: Int,
     val isFullScreen: Boolean,
-    val nodes: List<NodeSnapshot>
+    val nodes: List<NodeSnapshot>,
+    val complete: Boolean = true,
+    val windowId: Int? = null
 )
 
 /**
@@ -116,7 +118,8 @@ data class ActionCommand(
     val preferredMethod: ClickMethod,
     val allowImmediateGestureFallback: Boolean,
     val sinceLaunchMs: Long,
-    val attemptNumber: Int
+    val attemptNumber: Int,
+    val retryTarget: TargetEvidence? = null
 )
 
 sealed interface EvaluationResult {
@@ -133,5 +136,7 @@ sealed interface EvaluationResult {
 enum class VerifyOutcome {
     IGNORED_STALE,
     VERIFIED_CLOSED,
-    STILL_PRESENT
+    STILL_PRESENT,
+    NAVIGATED,
+    UNOBSERVED
 }

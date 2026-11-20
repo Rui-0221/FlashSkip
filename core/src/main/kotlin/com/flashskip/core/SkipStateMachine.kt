@@ -14,9 +14,8 @@ class SkipStateMachine(
         const val SPLASH_ACTIVITY_MIN_WINDOW_MS = 10000L
         const val MIN_WINDOW_MS = 3000L
         const val MAX_WINDOW_MS = 15000L
-        const val DEFAULT_COOLDOWN_MS = 450L
+        const val DEFAULT_COOLDOWN_MS = 180L
         const val DEFAULT_MAX_ATTEMPTS = 4
-        const val VERIFY_WINDOW_MS = 2000L
     }
 
     var activePackage: String = ""
@@ -35,11 +34,12 @@ class SkipStateMachine(
         private set
 
     private var attemptSeq: Long = 0L
-    private var pendingVerifySessionId: Long = -1L
-    private var pendingVerifyAttemptId: Long = -1L
-    private var pendingVerifyPkg: String = ""
-    private var pendingVerifyMethod: ClickMethod? = null
-    private var previousNodeActionHadNoEffect: Boolean = false
+    private data class PendingAttempt(val command: ActionCommand, var method: ClickMethod)
+
+    private var pendingAttempt: PendingAttempt? = null
+    private var gestureRetryTarget: TargetEvidence? = null
+    private var launchWindowId: Int? = null
+    private var navigationDestination: ForegroundWindow? = null
     private var lastObserveLogAtMs: Long = 0L
     private var lastOutOfWindowSessionLogged: Long = -1L
 
@@ -57,28 +57,38 @@ class SkipStateMachine(
         userDisabledPackages: Set<String> = emptySet(),
         userAllowedPackages: Set<String> = emptySet(),
         selfTestPackage: String? = null,
-        selfTestActivity: String? = null
+        selfTestActivity: String? = null,
+        windowId: Int? = null,
+        confirmedFullscreenActivity: Boolean = false
     ): VerifyOutcome {
         if (pkg.isBlank()) return VerifyOutcome.IGNORED_STALE
 
         if (PackagePolicy.isTransientOverlay(pkg, className, isFullScreen)) {
             return VerifyOutcome.IGNORED_STALE
         }
-
-        // Check if current transition completes a pending verification on the same package
-        var verifyOutcome = VerifyOutcome.IGNORED_STALE
-        if (pendingVerifyAttemptId >= 0 &&
-            pkg == pendingVerifyPkg &&
-            nowMs - lastClickAtMs < VERIFY_WINDOW_MS &&
-            className != activeActivity
-        ) {
-            verifyOutcome = VerifyOutcome.VERIFIED_CLOSED
-            clearPendingVerify()
-            armed = false
+        if (navigationDestination != null && windowId != null) {
+            if (navigationDestination == ForegroundWindow(pkg, windowId)) return VerifyOutcome.IGNORED_STALE
+            navigationDestination = null
         }
 
+        val isNewPackage = pkg != activePackage
+        val activityChanged = className.isNotEmpty() && className != activeActivity &&
+            (className.endsWith("Activity", ignoreCase = true) ||
+                className.startsWith("$pkg.") && isFullScreen)
+        val sameActivityRelaunched = confirmedFullscreenActivity && className.isNotBlank() &&
+            className == activeActivity && launchWindowId != null && windowId != null && windowId != launchWindowId
+        val newActivity = activityChanged || sameActivityRelaunched
         val isSelfPackage = selfTestPackage != null && pkg == selfTestPackage
         val isSelfTestAllowed = isSelfPackage && className == selfTestActivity
+        if (isSelfPackage && !isSelfTestAllowed && !isNewPackage && !activityChanged) {
+            // Widget-class events in the test window must not disarm the test Activity.
+            return VerifyOutcome.IGNORED_STALE
+        }
+        val verifyOutcome = if (pendingAttempt != null && (isNewPackage || newActivity)) {
+            VerifyOutcome.NAVIGATED
+        } else {
+            VerifyOutcome.IGNORED_STALE
+        }
 
         if (isSelfPackage && !isSelfTestAllowed) {
             disarmToPackage(pkg, className)
@@ -92,29 +102,14 @@ class SkipStateMachine(
             return verifyOutcome
         }
 
-        val isNewPackage = pkg != activePackage
-        val looksLikeActivity = isFullScreen ||
-            isSelfTestAllowed ||
-            className.endsWith("Activity", ignoreCase = true) ||
-            className.contains(".splash.", ignoreCase = true)
-        val isNewFullScreenActivity = !isNewPackage &&
-            looksLikeActivity &&
-            className.isNotEmpty() &&
-            className != activeActivity
-
-        if (isNewPackage || isNewFullScreenActivity) {
-            // If we just verified closure via this exact Activity transition, stay disarmed
-            // unless we switched to a brand-new package.
-            val shouldArm = isNewPackage || verifyOutcome != VerifyOutcome.VERIFIED_CLOSED
+        if (verifyOutcome == VerifyOutcome.NAVIGATED ||
+            gestureRetryTarget != null && (isNewPackage || newActivity)
+        ) {
+            disarmToPackage(pkg, className)
+        } else if (isNewPackage || newActivity) {
             activePackage = pkg
             activeActivity = className
-            if (shouldArm) {
-                startNewSession(nowMs)
-            } else {
-                armed = false
-            }
-        } else if (className.isNotEmpty()) {
-            activeActivity = className
+            startNewSession(nowMs, windowId)
         }
 
         return verifyOutcome
@@ -138,6 +133,11 @@ class SkipStateMachine(
 
         val pkg = snapshot.packageName
         if (pkg.isBlank()) return EvaluationResult.NoOp
+        val retryTarget = gestureRetryTarget
+        if (retryTarget != null && (observeOnly || !retryTarget.matchesWindow(pkg, snapshot.windowId))) {
+            cancelGestureRetry()
+            return EvaluationResult.NoOp
+        }
 
         val isSelfPackage = selfTestPackage != null && pkg == selfTestPackage
         if (isSelfPackage) {
@@ -149,12 +149,7 @@ class SkipStateMachine(
             return EvaluationResult.NoOp
         }
 
-        // If root package disagrees with activePackage on a non-transient window (e.g. cold-start mismatch),
-        // align activePackage to the authoritative root package.
-        if (pkg != activePackage) {
-            activePackage = pkg
-            startNewSession(nowMs)
-        }
+        if (pkg != activePackage) return EvaluationResult.NoOp
 
         val clampedWindowMs = windowMs.coerceIn(MIN_WINDOW_MS, MAX_WINDOW_MS)
         val actLower = activeActivity.ifEmpty { snapshot.activityName }.lowercase()
@@ -178,11 +173,12 @@ class SkipStateMachine(
         }
 
         if (!observeOnly) {
+            if (pendingAttempt != null) return EvaluationResult.NoOp
             if (attempts >= maxAttempts) {
                 armed = false
                 return EvaluationResult.NoOp
             }
-            if (lastClickAtMs > 0L && nowMs - lastClickAtMs < cooldownMs) {
+            if (gestureRetryTarget == null && attempts > 0 && nowMs - lastClickAtMs < cooldownMs) {
                 return EvaluationResult.NoOp
             }
         } else {
@@ -191,7 +187,15 @@ class SkipStateMachine(
             }
         }
 
-        val decision = SkipMatcher.findBestMatch(snapshot, ruleIndex) ?: return EvaluationResult.NoOp
+        val decision = SkipMatcher.findBestMatch(snapshot, ruleIndex)
+        if (retryTarget != null && (decision == null ||
+                !retryTarget.matches(snapshot.nodes[decision.targetNodeIndex]) ||
+                snapshot.nodes.count(retryTarget::matches) != 1)
+        ) {
+            cancelGestureRetry()
+            return EvaluationResult.NoOp
+        }
+        decision ?: return EvaluationResult.NoOp
 
         if (observeOnly) {
             lastObserveLogAtMs = nowMs
@@ -201,20 +205,15 @@ class SkipStateMachine(
         val preferredMethod = when {
             decision.forceGestureOnly -> ClickMethod.GESTURE
             decision.isShakeAd -> ClickMethod.GESTURE // Bypass ACTION_CLICK fake-success delay on shake ads
-            previousNodeActionHadNoEffect -> ClickMethod.GESTURE // Escalate after fake-success ACTION_CLICK
+            retryTarget != null -> ClickMethod.GESTURE
             else -> ClickMethod.NODE_ACTION
         }
 
         attempts++
         attemptSeq++
         lastClickAtMs = nowMs
-        pendingVerifySessionId = sessionId
-        pendingVerifyAttemptId = attemptSeq
-        pendingVerifyPkg = pkg
-        pendingVerifyMethod = preferredMethod
-
-        return EvaluationResult.ExecuteClick(
-            ActionCommand(
+        gestureRetryTarget = null
+        val command = ActionCommand(
                 sessionId = sessionId,
                 attemptId = attemptSeq,
                 packageName = pkg,
@@ -222,63 +221,51 @@ class SkipStateMachine(
                 preferredMethod = preferredMethod,
                 allowImmediateGestureFallback = (preferredMethod == ClickMethod.NODE_ACTION),
                 sinceLaunchMs = sinceLaunch,
-                attemptNumber = attempts
-            )
+                attemptNumber = attempts,
+                retryTarget = retryTarget
         )
+        pendingAttempt = PendingAttempt(command, preferredMethod)
+        return EvaluationResult.ExecuteClick(command)
     }
 
     /**
      * Records the actual method dispatched (in case NODE_ACTION returned false and fell back immediately).
      */
     fun onActionDispatched(sessionId: Long, attemptId: Long, actualMethod: ClickMethod, ok: Boolean) {
-        if (sessionId != this.sessionId || attemptId != pendingVerifyAttemptId) return
-        pendingVerifyMethod = actualMethod
-        if (!ok) {
-            clearPendingVerify()
-        }
+        val pending = pendingAttemptFor(sessionId, attemptId) ?: return
+        pending.method = actualMethod
+        if (!ok) finishVerification(sessionId, attemptId, VerifyOutcome.UNOBSERVED)
     }
 
-    /**
-     * Evaluates delayed verification. Protects against stale cross-app contamination:
-     * only updates state if [sessionId] matches, and if the foreground package changed away
-     * from [clickedPkg], closes verification without disarming the new foreground app.
-     */
-    fun onVerifyCheck(
+    fun finishVerification(
         sessionId: Long,
         attemptId: Long,
-        clickedPkg: String,
-        currentForegroundPkg: String?,
-        stillHasSkipTarget: Boolean
+        outcome: VerifyOutcome,
+        retryTarget: TargetEvidence? = null
     ): VerifyOutcome {
-        if (attemptId != pendingVerifyAttemptId) {
-            return VerifyOutcome.IGNORED_STALE
+        val pending = pendingAttemptFor(sessionId, attemptId) ?: return VerifyOutcome.IGNORED_STALE
+        if (outcome == VerifyOutcome.IGNORED_STALE) return outcome
+        pendingAttempt = null
+        gestureRetryTarget = retryTarget.takeIf {
+            outcome == VerifyOutcome.STILL_PRESENT && pending.method == ClickMethod.NODE_ACTION
         }
-        val sameSession = (sessionId == this.sessionId)
-        val method = pendingVerifyMethod
-        clearPendingVerify()
+        armed = gestureRetryTarget != null
+        return outcome
+    }
 
-        // User or ad closed the splash and moved to another app/home screen
-        if (currentForegroundPkg != null && currentForegroundPkg != clickedPkg) {
-            if (sameSession) armed = false
-            return VerifyOutcome.VERIFIED_CLOSED
-        }
+    private fun pendingAttemptFor(sessionId: Long, attemptId: Long): PendingAttempt? =
+        pendingAttempt?.takeIf { it.command.sessionId == sessionId && it.command.attemptId == attemptId }
 
-        if (!sameSession) {
-            return VerifyOutcome.IGNORED_STALE
-        }
+    fun cancelGestureRetry() {
+        if (gestureRetryTarget == null) return
+        gestureRetryTarget = null
+        armed = false
+    }
 
-        if (!stillHasSkipTarget) {
-            armed = false
-            previousNodeActionHadNoEffect = false
-            return VerifyOutcome.VERIFIED_CLOSED
-        }
-
-        // Still present! If we used NODE_ACTION (which returned true as a fake-success),
-        // escalate next attempt directly to GESTURE.
-        if (method == ClickMethod.NODE_ACTION) {
-            previousNodeActionHadNoEffect = true
-        }
-        return VerifyOutcome.STILL_PRESENT
+    fun onNavigationObserved(destination: ForegroundWindow) {
+        if (!destination.valid) return
+        disarmToPackage(destination.packageName, "")
+        navigationDestination = destination
     }
 
     /**
@@ -286,7 +273,8 @@ class SkipStateMachine(
      */
     fun onScreenOff() {
         armed = false
-        clearPendingVerify()
+        pendingAttempt = null
+        gestureRetryTarget = null
     }
 
     /**
@@ -313,30 +301,27 @@ class SkipStateMachine(
         startNewSession(nowMs)
     }
 
-    private fun startNewSession(nowMs: Long) {
+    private fun startNewSession(nowMs: Long, windowId: Int? = null) {
         sessionId++
+        launchWindowId = windowId
+        navigationDestination = null
         launchAtMs = nowMs
         lastClickAtMs = 0L
         attempts = 0
         armed = true
-        previousNodeActionHadNoEffect = false
-        clearPendingVerify()
+        pendingAttempt = null
+        gestureRetryTarget = null
+        lastObserveLogAtMs = 0L
     }
 
     private fun disarmToPackage(pkg: String, className: String) {
         sessionId++
+        launchWindowId = null
         activePackage = pkg
         activeActivity = className
         armed = false
         attempts = 0
-        previousNodeActionHadNoEffect = false
-        clearPendingVerify()
-    }
-
-    private fun clearPendingVerify() {
-        pendingVerifySessionId = -1L
-        pendingVerifyAttemptId = -1L
-        pendingVerifyPkg = ""
-        pendingVerifyMethod = null
+        pendingAttempt = null
+        gestureRetryTarget = null
     }
 }

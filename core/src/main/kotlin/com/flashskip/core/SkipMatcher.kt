@@ -30,11 +30,12 @@ object SkipMatcher {
         "片头", "片尾", "更新", "此题", "问卷", "领取", "下载", "购买",
         "开通", "立即", "红包", "福利", "抽奖", "安装", "详情", "查看",
         "开启", "允许", "同意", "授权", "会员", "充值",
-        "intro", "tutorial", "step", "login", "verify", "episode", "guide"
+        "支付", "付款", "转账", "收款",
+        "intro", "tutorial", "step", "login", "verify", "episode", "guide", "payment", "checkout"
     )
 
     private val ID_BLACKLIST = listOf(
-        "guide", "login", "step", "intro", "verify", "tutorial", "signin", "signup"
+        "guide", "login", "step", "intro", "verify", "tutorial", "signin", "signup", "payment", "checkout"
     )
 
     private val SHAKE_TEXTS = listOf("摇一摇", "扭一扭", "摇动手机", "摇动", "晃动", "前倾", "转一转")
@@ -84,7 +85,7 @@ object SkipMatcher {
                     hasVisibleAdTag = true
                     hasVisibleCreativeSignal = true
                 }
-                if (desc == "NativeVideoAdView" || desc == "virtualNode") {
+                if (desc == "NativeVideoAdView" || desc == "virtualNode" || desc == "广告" || desc == "推广") {
                     hasVisibleCreativeSignal = true
                     hasVisibleAdTag = true
                 }
@@ -105,9 +106,10 @@ object SkipMatcher {
         var best: MatchDecision? = null
 
         for (node in window.nodes) {
-            if (!node.isVisibleToUser) continue
+            if (!node.isVisibleToUser || !node.isEnabled) continue
             val clipped = node.bounds.clippedToScreen(window.screenWidth, window.screenHeight) ?: continue
             if (!isButtonSized(clipped, window.screenWidth, window.screenHeight)) continue
+            if (!isInEdgeOrCornerZone(node.bounds, window.screenWidth, window.screenHeight, rootBounds)) continue
 
             val eff = node.effectiveText
             val sid = node.shortId
@@ -126,7 +128,7 @@ object SkipMatcher {
                     rule.textExact != null -> eff == rule.textExact
                     rule.descExact != null -> node.contentDescription.trim() == rule.descExact
                     rule.textRegex != null -> Regex(rule.textRegex, RegexOption.IGNORE_CASE).matches(eff)
-                    rule.viewIdContains != null -> sid.contains(rule.viewIdContains.lowercase())
+                    rule.viewIdContains != null -> hasAdContext && sid.contains(rule.viewIdContains.lowercase())
                     else -> false
                 }
                 if (hit) {
@@ -139,23 +141,13 @@ object SkipMatcher {
 
             // 2. Generic L1 text/desc match
             if (matchedVia == null && eff.isNotEmpty() && isGenericSkipText(eff)) {
-                if (!isInEdgeOrCornerZone(node.bounds, window.screenWidth, window.screenHeight, rootBounds)) {
-                    continue
-                }
                 matchedVia = if (node.text.isNotBlank()) "text" else "desc"
                 baseScore = if (eff == "跳过" || eff.equals("skip", ignoreCase = true) || eff == "跳过广告") 80 else 70
                 matchedLabel = eff
-                // Split countdown pills like "5 | 跳过" frequently ignore Accessibility ACTION_CLICK
-                if (eff.contains('|') || eff.contains('｜')) {
-                    forceGestureFromRule = true
-                }
             }
 
             // 3. Generic L1 id match or ad-context-only close symbol ("关闭" / "×")
-            if (matchedVia == null && hasAdContext &&
-                eff.isNotEmpty() && AD_CLOSE_SYMBOL_REGEX.matches(eff) &&
-                isInEdgeOrCornerZone(node.bounds, window.screenWidth, window.screenHeight, rootBounds)
-            ) {
+            if (matchedVia == null && hasAdContext && AD_CLOSE_SYMBOL_REGEX.matches(eff)) {
                 matchedVia = "ad_close"
                 baseScore = 50
                 matchedLabel = eff
@@ -163,7 +155,6 @@ object SkipMatcher {
 
             if (matchedVia == null && sid.contains("skip") && !ID_BLACKLIST.any { sid.contains(it) }) {
                 if (!hasAdContext) continue
-                if (!isInEdgeOrCornerZone(node.bounds, window.screenWidth, window.screenHeight, rootBounds)) continue
                 matchedVia = "id"
                 baseScore = 40
                 matchedLabel = node.viewId.ifEmpty { "id:skip" }
@@ -189,7 +180,10 @@ object SkipMatcher {
                 window.screenHeight
             )
             val clickNode = window.nodes[clickIdx]
-            val forceGesture = forceGestureFromRule || forceGestureFromOversizedParent || !clickNode.isClickable || !clickNode.isEnabled
+            // Split countdown pills can ignore ACTION_CLICK even when marked clickable.
+            val splitCountdown = (eff.contains('|') || eff.contains('｜')) && isGenericSkipText(eff)
+            val forceGesture = forceGestureFromRule || splitCountdown || forceGestureFromOversizedParent ||
+                !clickNode.isClickable || !clickNode.isEnabled
 
             val positionBonus = computePositionBonus(node.bounds, window.screenWidth, window.screenHeight, rootBounds)
             val clickableBonus = if (!forceGesture && clickNode.isClickable) 5 else 0
@@ -360,7 +354,7 @@ object SkipMatcher {
                 // Ancestor is oversized (likely full-screen ad container); NEVER click it!
                 return node.index to true
             }
-            if (parent.isClickable && parent.isEnabled) {
+            if (parent.isVisibleToUser && parent.isClickable && parent.isEnabled) {
                 return parent.index to false
             }
             curIndex = parent.parentIndex

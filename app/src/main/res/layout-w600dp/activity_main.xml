@@ -1,0 +1,229 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/rootContainer"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/ef_paper">
+
+    <!-- Endfield Corner Contours Backdrop (9% ink alpha, invisible in Classic theme) -->
+    <ImageView
+        android:id="@+id/ivContourTopRight"
+        android:layout_width="320dp"
+        android:layout_height="260dp"
+        android:layout_gravity="top|end"
+        android:contentDescription="@null"
+        android:importantForAccessibility="no"
+        android:scaleType="fitXY"
+        android:src="@drawable/ic_ef_contours"
+        android:visibility="gone" />
+
+    <ImageView
+        android:id="@+id/ivContourBottomLeft"
+        android:layout_width="340dp"
+        android:layout_height="280dp"
+        android:layout_gravity="bottom|start"
+        android:contentDescription="@null"
+        android:importantForAccessibility="no"
+        android:rotation="180"
+        android:scaleType="fitXY"
+        android:src="@drawable/ic_ef_contours"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <include layout="@layout/console_header" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:orientation="horizontal">
+
+            <!-- Left Navigation Rail on >=600dp tablets/foldables -->
+            <LinearLayout
+                android:id="@+id/tabNavBar"
+                android:layout_width="184dp"
+                android:layout_height="match_parent"
+                android:background="@color/ef_panel"
+                android:orientation="horizontal">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:padding="12dp">
+
+                    <LinearLayout
+                        android:id="@+id/tabHome"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:minHeight="52dp"
+                        android:orientation="horizontal"
+                        android:paddingStart="12dp"
+                        android:paddingTop="10dp"
+                        android:paddingEnd="12dp"
+                        android:paddingBottom="10dp">
+
+                        <ImageView
+                            android:id="@+id/tabHomeIcon"
+                            android:layout_width="22dp"
+                            android:layout_height="22dp"
+                            android:contentDescription="@null"
+                            android:importantForAccessibility="no"
+                            android:src="@drawable/fs_nav_home" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="10dp"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:id="@+id/tabHomeEn"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="// HOME"
+                                android:textSize="9.5sp"
+                                android:visibility="gone" />
+
+                            <TextView
+                                android:id="@+id/tabHomeZh"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:ellipsize="end"
+                                android:maxLines="1"
+                                android:text="首页"
+                                android:textColor="@color/ef_ink"
+                                android:textSize="14.5sp" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/tabKeepAlive"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:minHeight="52dp"
+                        android:orientation="horizontal"
+                        android:paddingStart="12dp"
+                        android:paddingTop="10dp"
+                        android:paddingEnd="12dp"
+                        android:paddingBottom="10dp">
+
+                        <ImageView
+                            android:id="@+id/tabKeepAliveIcon"
+                            android:layout_width="22dp"
+                            android:layout_height="22dp"
+                            android:contentDescription="@null"
+                            android:importantForAccessibility="no"
+                            android:src="@drawable/fs_nav_shield" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="10dp"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:id="@+id/tabKeepAliveEn"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="// GUARD"
+                                android:textSize="9.5sp"
+                                android:visibility="gone" />
+
+                            <TextView
+                                android:id="@+id/tabKeepAliveZh"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:ellipsize="end"
+                                android:maxLines="1"
+                                android:text="后台保活"
+                                android:textColor="@color/ef_ink"
+                                android:textSize="14.5sp" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/tabMore"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:minHeight="52dp"
+                        android:orientation="horizontal"
+                        android:paddingStart="12dp"
+                        android:paddingTop="10dp"
+                        android:paddingEnd="12dp"
+                        android:paddingBottom="10dp">
+
+                        <ImageView
+                            android:id="@+id/tabMoreIcon"
+                            android:layout_width="22dp"
+                            android:layout_height="22dp"
+                            android:contentDescription="@null"
+                            android:importantForAccessibility="no"
+                            android:src="@drawable/fs_nav_settings" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="10dp"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:id="@+id/tabMoreEn"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="// CONFIG"
+                                android:textSize="9.5sp"
+                                android:visibility="gone" />
+
+                            <TextView
+                                android:id="@+id/tabMoreZh"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:ellipsize="end"
+                                android:maxLines="1"
+                                android:text="更多设置"
+                                android:textColor="@color/ef_ink"
+                                android:textSize="14.5sp" />
+                        </LinearLayout>
+                    </LinearLayout>
+                </LinearLayout>
+
+                <View
+                    android:id="@+id/navDivider"
+                    android:layout_width="@dimen/ef_hairline"
+                    android:layout_height="match_parent"
+                    android:background="@color/ef_rule" />
+            </LinearLayout>
+
+            <ScrollView
+                android:id="@+id/mainScroll"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:clipToPadding="false"
+                android:fillViewport="true">
+
+                <include layout="@layout/console_tabs_content" />
+            </ScrollView>
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>

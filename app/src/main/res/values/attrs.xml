@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <declare-styleable name="EfButton">
+        <attr name="efKind" format="enum">
+            <enum name="normal" value="0" />
+            <enum name="go" value="1" />
+            <enum name="danger" value="2" />
+        </attr>
+        <attr name="efSmall" format="boolean" />
+        <attr name="efCutSize" format="dimension" />
+    </declare-styleable>
+
+    <declare-styleable name="EfHatchView">
+        <attr name="efHatchBordered" format="boolean" />
+    </declare-styleable>
+
+    <declare-styleable name="EfWrapLayout">
+        <attr name="efHorizontalGap" format="dimension" />
+        <attr name="efVerticalGap" format="dimension" />
+    </declare-styleable>
+</resources>

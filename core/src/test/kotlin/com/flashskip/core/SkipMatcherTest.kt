@@ -143,6 +143,21 @@ class SkipMatcherTest {
     }
 
     @Test
+    fun `generic SDK controls use a safe node click except for a split countdown`() {
+        for (id in listOf("layout_skip", "splash_skip")) {
+            val root = node(0, bounds = fullScreen, clickable = false, depth = 0)
+            val control = node(1, parentIndex = 0, viewId = "com.example.app:id/$id")
+            val plain = SkipMatcher.findBestMatch(makeWindow(nodes = listOf(root, control)), ruleIndex)!!
+            assertFalse(plain.forceGestureOnly)
+            assertEquals(control.index, plain.clickNodeIndex)
+
+            val countdown = control.copy(text = "5 | 跳过")
+            val split = SkipMatcher.findBestMatch(makeWindow(nodes = listOf(root, countdown)), ruleIndex)!!
+            assertTrue(split.forceGestureOnly)
+        }
+    }
+
+    @Test
     fun `rejects oversized skip node even if text matches`() {
         val hugeBanner = RectBounds(0, 0, screenW, 600)
         val win = makeWindow(nodes = listOf(node(0, text = "跳过", bounds = hugeBanner)))

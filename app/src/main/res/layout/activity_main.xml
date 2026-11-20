@@ -1,233 +1,206 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/rootContainer"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fillViewport="true">
+    android:background="@color/ef_paper">
+
+    <!-- Endfield Corner Contours Backdrop (9% ink alpha, invisible in Classic theme) -->
+    <ImageView
+        android:id="@+id/ivContourTopRight"
+        android:layout_width="290dp"
+        android:layout_height="240dp"
+        android:layout_gravity="top|end"
+        android:contentDescription="@null"
+        android:importantForAccessibility="no"
+        android:scaleType="fitXY"
+        android:src="@drawable/ic_ef_contours"
+        android:visibility="gone" />
+
+    <ImageView
+        android:id="@+id/ivContourBottomLeft"
+        android:layout_width="320dp"
+        android:layout_height="260dp"
+        android:layout_gravity="bottom|start"
+        android:contentDescription="@null"
+        android:importantForAccessibility="no"
+        android:rotation="180"
+        android:scaleType="fitXY"
+        android:src="@drawable/ic_ef_contours"
+        android:visibility="gone" />
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="20dp">
+        android:layout_height="match_parent"
+        android:orientation="vertical">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/title"
-            android:textSize="26sp"
-            android:textStyle="bold" />
+        <include layout="@layout/console_header" />
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
-            android:text="@string/subtitle"
-            android:textSize="13sp" />
-
-        <TextView
-            android:id="@+id/tvStatus"
+        <ScrollView
+            android:id="@+id/mainScroll"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:background="@color/status_bg"
-            android:padding="12dp"
-            android:textSize="15sp"
-            android:textStyle="bold" />
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:clipToPadding="false"
+            android:fillViewport="true">
 
-        <TextView
-            android:id="@+id/tvKeepAliveInfo"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:background="@color/status_bg"
-            android:padding="10dp"
-            android:textSize="12sp" />
+            <include layout="@layout/console_tabs_content" />
+        </ScrollView>
 
-        <TextView
-            android:id="@+id/tvStats"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:background="@color/status_bg"
-            android:padding="10dp"
-            android:text="@string/stats_empty"
-            android:textSize="13sp" />
-
-        <com.google.android.material.materialswitch.MaterialSwitch
-            android:id="@+id/swMaster"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:minHeight="48dp"
-            android:text="@string/master_switch"
-            android:textOff=""
-            android:textOn=""
-            android:textSize="15sp"
-            app:showText="false" />
-
-        <com.google.android.material.materialswitch.MaterialSwitch
-            android:id="@+id/swObserve"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:minHeight="48dp"
-            android:text="@string/observe_switch"
-            android:textOff=""
-            android:textOn=""
-            android:textSize="15sp"
-            app:showText="false" />
-
-        <TextView
-            android:id="@+id/tvWindow"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:text="@string/window_label"
-            android:textSize="14sp" />
-
-        <SeekBar
-            android:id="@+id/sbWindow"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:max="12"
-            android:progress="3" />
-
-        <com.google.android.material.materialswitch.MaterialSwitch
-            android:id="@+id/swDiag"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:minHeight="48dp"
-            android:text="@string/diag_switch"
-            android:textOff=""
-            android:textOn=""
-            android:textSize="14sp"
-            app:showText="false" />
-
-        <Button
-            android:id="@+id/btnEnable"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:text="@string/btn_enable" />
-
+        <!-- Dual-Theme 3-Tab Bottom Navigation Bar -->
         <LinearLayout
+            android:id="@+id/tabNavBar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:orientation="horizontal">
+            android:background="@color/ef_panel"
+            android:orientation="vertical">
 
-            <Button
-                android:id="@+id/btnRestrictedSettings"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="4dp"
-                android:layout_weight="1"
-                android:text="@string/btn_restricted_settings"
-                android:textSize="12sp" />
+            <View
+                android:id="@+id/navDivider"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/ef_hairline"
+                android:background="@color/ef_rule" />
 
-            <Button
-                android:id="@+id/btnBatteryOpt"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:layout_width="0dp"
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:layout_weight="1"
-                android:text="@string/btn_battery_opt"
-                android:textSize="12sp" />
+                android:orientation="horizontal"
+                android:paddingStart="8dp"
+                android:paddingTop="6dp"
+                android:paddingEnd="8dp"
+                android:paddingBottom="6dp">
+
+                <LinearLayout
+                    android:id="@+id/tabHome"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:minHeight="52dp"
+                    android:orientation="vertical"
+                    android:paddingStart="6dp"
+                    android:paddingTop="6dp"
+                    android:paddingEnd="6dp"
+                    android:paddingBottom="6dp">
+
+                    <ImageView
+                        android:id="@+id/tabHomeIcon"
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:contentDescription="@null"
+                        android:importantForAccessibility="no"
+                        android:src="@drawable/fs_nav_home" />
+
+                    <TextView
+                        android:id="@+id/tabHomeEn"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="HOME"
+                        android:textSize="9.5sp"
+                        android:visibility="gone" />
+
+                    <TextView
+                        android:id="@+id/tabHomeZh"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:text="首页"
+                        android:textColor="@color/ef_ink"
+                        android:textSize="13.5sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/tabKeepAlive"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:layout_weight="1"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:minHeight="52dp"
+                    android:orientation="vertical"
+                    android:paddingStart="6dp"
+                    android:paddingTop="6dp"
+                    android:paddingEnd="6dp"
+                    android:paddingBottom="6dp">
+
+                    <ImageView
+                        android:id="@+id/tabKeepAliveIcon"
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:contentDescription="@null"
+                        android:importantForAccessibility="no"
+                        android:src="@drawable/fs_nav_shield" />
+
+                    <TextView
+                        android:id="@+id/tabKeepAliveEn"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="GUARD"
+                        android:textSize="9.5sp"
+                        android:visibility="gone" />
+
+                    <TextView
+                        android:id="@+id/tabKeepAliveZh"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:text="后台保活"
+                        android:textColor="@color/ef_ink"
+                        android:textSize="13.5sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/tabMore"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:layout_weight="1"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:minHeight="52dp"
+                    android:orientation="vertical"
+                    android:paddingStart="6dp"
+                    android:paddingTop="6dp"
+                    android:paddingEnd="6dp"
+                    android:paddingBottom="6dp">
+
+                    <ImageView
+                        android:id="@+id/tabMoreIcon"
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:contentDescription="@null"
+                        android:importantForAccessibility="no"
+                        android:src="@drawable/fs_nav_settings" />
+
+                    <TextView
+                        android:id="@+id/tabMoreEn"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="CONFIG"
+                        android:textSize="9.5sp"
+                        android:visibility="gone" />
+
+                    <TextView
+                        android:id="@+id/tabMoreZh"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:text="更多设置"
+                        android:textColor="@color/ef_ink"
+                        android:textSize="13.5sp" />
+                </LinearLayout>
+            </LinearLayout>
         </LinearLayout>
-
-        <Button
-            android:id="@+id/btnTest"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="@string/btn_test" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
-
-            <Button
-                android:id="@+id/btnTestLab"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="4dp"
-                android:layout_weight="1"
-                android:text="@string/btn_test_lab"
-                android:textSize="12sp" />
-
-            <Button
-                android:id="@+id/btnExclusions"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:layout_weight="1"
-                android:text="@string/btn_exclusions"
-                android:textSize="12sp" />
-        </LinearLayout>
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
-            android:lineSpacingExtra="3dp"
-            android:text="@string/guide"
-            android:textSize="12.5sp" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="@string/log_header"
-            android:textSize="14sp"
-            android:textStyle="bold" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
-
-            <Button
-                android:id="@+id/btnRefresh"
-                style="@style/Widget.MaterialComponents.Button.TextButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/btn_refresh" />
-
-            <Button
-                android:id="@+id/btnCopyLog"
-                style="@style/Widget.MaterialComponents.Button.TextButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/btn_copy_log" />
-
-            <Button
-                android:id="@+id/btnShareLog"
-                style="@style/Widget.MaterialComponents.Button.TextButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/btn_share_log" />
-
-            <Button
-                android:id="@+id/btnClearLog"
-                style="@style/Widget.MaterialComponents.Button.TextButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/btn_clear_log" />
-        </LinearLayout>
-
-        <TextView
-            android:id="@+id/tvLog"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:background="@color/status_bg"
-            android:fontFamily="monospace"
-            android:padding="10dp"
-            android:textIsSelectable="true"
-            android:textSize="11sp" />
     </LinearLayout>
-</ScrollView>
+</FrameLayout>

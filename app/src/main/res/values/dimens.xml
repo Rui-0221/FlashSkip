@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="ef_page_pad">16dp</dimen>
+    <dimen name="ef_gap">16dp</dimen>
+    <dimen name="ef_row_pad">14dp</dimen>
+    <dimen name="ef_touch_min">48dp</dimen>
+    <dimen name="ef_cut_small">10dp</dimen>
+    <dimen name="ef_cut_button">12dp</dimen>
+    <dimen name="ef_cut_sheet">20dp</dimen>
+    <dimen name="fs_card_radius">16dp</dimen>
+    <dimen name="fs_inner_radius">12dp</dimen>
+    <dimen name="fs_pill_radius">999dp</dimen>
+    <dimen name="ef_hairline">1dp</dimen>
+    <dimen name="ef_tab_accent">4dp</dimen>
+    <dimen name="ef_trace_bar">4dp</dimen>
+    <dimen name="ef_tri_strip">1dp</dimen>
+    <dimen name="ef_focus_stroke">2dp</dimen>
+</resources>

@@ -18,15 +18,21 @@ class ExtractedTree(
 ) : Closeable {
 
     fun nodeAt(index: Int): AccessibilityNodeInfo? = nativeNodes.getOrNull(index)
+    val windowId: Int get() = nativeNodes.first().windowId
+
+    fun currentTarget(index: Int, node: AccessibilityNodeInfo, bounds: Rect): NodeSnapshot =
+        snapshot.nodes[index].copy(
+            className = node.className?.toString().orEmpty(),
+            viewId = node.viewIdResourceName.orEmpty(),
+            text = node.text?.toString().orEmpty(),
+            contentDescription = node.contentDescription?.toString().orEmpty(),
+            bounds = RectBounds(bounds.left, bounds.top, bounds.right, bounds.bottom),
+            isVisibleToUser = node.isVisibleToUser,
+            isEnabled = node.isEnabled
+        )
 
     override fun close() {
-        for (node in nativeNodes) {
-            try {
-                @Suppress("DEPRECATION")
-                node.recycle()
-            } catch (_: Exception) {
-            }
-        }
+        nativeNodes.forEach(::recycleNode)
     }
 }
 
@@ -52,66 +58,76 @@ object NodeExtractor {
         queue.addLast(PendingNode(root, parentIndex = -1, depth = 0))
 
         val rect = Rect()
-        val pkg = root.packageName?.toString().orEmpty()
         var rootFullScreen = false
+        var complete = true
 
-        while (queue.isNotEmpty() && snapshots.size < maxNodes) {
-            val item = queue.removeFirst()
-            val node = item.node
-            val idx = snapshots.size
-            natives.add(node)
+        try {
+            val pkg = root.packageName?.toString().orEmpty()
+            while (queue.isNotEmpty() && snapshots.size < maxNodes) {
+                val item = queue.removeFirst()
+                val node = item.node
+                val idx = snapshots.size
+                natives.add(node)
 
-            node.getBoundsInScreen(rect)
-            val bounds = RectBounds(rect.left, rect.top, rect.right, rect.bottom)
-            if (idx == 0 && screenWidth > 0 && screenHeight > 0) {
-                rootFullScreen = bounds.width >= screenWidth * 0.85f &&
-                    bounds.height >= screenHeight * 0.85f
-            }
+                node.getBoundsInScreen(rect)
+                val bounds = RectBounds(rect.left, rect.top, rect.right, rect.bottom)
+                if (idx == 0 && screenWidth > 0 && screenHeight > 0) {
+                    rootFullScreen = bounds.width >= screenWidth * 0.85f &&
+                        bounds.height >= screenHeight * 0.85f
+                }
 
-            snapshots.add(
-                NodeSnapshot(
-                    index = idx,
-                    parentIndex = item.parentIndex,
-                    className = node.className?.toString().orEmpty(),
-                    viewId = node.viewIdResourceName.orEmpty(),
-                    text = node.text?.toString().orEmpty(),
-                    contentDescription = node.contentDescription?.toString().orEmpty(),
-                    bounds = bounds,
-                    isVisibleToUser = node.isVisibleToUser,
-                    isClickable = node.isClickable,
-                    isEnabled = node.isEnabled,
-                    depth = item.depth
+                snapshots.add(
+                    NodeSnapshot(
+                        index = idx,
+                        parentIndex = item.parentIndex,
+                        className = node.className?.toString().orEmpty(),
+                        viewId = node.viewIdResourceName.orEmpty(),
+                        text = node.text?.toString().orEmpty(),
+                        contentDescription = node.contentDescription?.toString().orEmpty(),
+                        bounds = bounds,
+                        isVisibleToUser = node.isVisibleToUser,
+                        isClickable = node.isClickable,
+                        isEnabled = node.isEnabled,
+                        depth = item.depth
+                    )
                 )
-            )
 
-            if (item.depth < MAX_DEPTH) {
                 val count = node.childCount
-                for (i in 0 until count) {
-                    if (snapshots.size + queue.size >= maxNodes) break
-                    val child = node.getChild(i) ?: continue
-                    queue.addLast(PendingNode(child, parentIndex = idx, depth = item.depth + 1))
+                if (item.depth < MAX_DEPTH) {
+                    for (i in 0 until count) {
+                        if (snapshots.size + queue.size >= maxNodes) {
+                            complete = false
+                            break
+                        }
+                        val child = node.getChild(i)
+                        if (child == null) {
+                            complete = false
+                        } else {
+                            queue.addLast(PendingNode(child, parentIndex = idx, depth = item.depth + 1))
+                        }
+                    }
+                } else if (count > 0) {
+                    complete = false
                 }
             }
-        }
 
-        // Recycle any queued-but-unvisited children if MAX_NODES was hit
-        while (queue.isNotEmpty()) {
-            try {
-                @Suppress("DEPRECATION")
-                queue.removeFirst().node.recycle()
-            } catch (_: Exception) {
-            }
+            val win = WindowSnapshot(
+                packageName = pkg,
+                activityName = activityName,
+                screenWidth = screenWidth,
+                screenHeight = screenHeight,
+                isFullScreen = rootFullScreen,
+                nodes = snapshots,
+                complete = complete && queue.isEmpty(),
+                windowId = root.windowId.takeIf { it >= 0 }
+            )
+            return ExtractedTree(win, natives)
+        } catch (e: Exception) {
+            natives.forEach(::recycleNode)
+            throw e
+        } finally {
+            queue.forEach { recycleNode(it.node) }
         }
-
-        val win = WindowSnapshot(
-            packageName = pkg,
-            activityName = activityName,
-            screenWidth = screenWidth,
-            screenHeight = screenHeight,
-            isFullScreen = rootFullScreen,
-            nodes = snapshots
-        )
-        return ExtractedTree(win, natives)
     }
 
     private data class PendingNode(
@@ -119,4 +135,12 @@ object NodeExtractor {
         val parentIndex: Int,
         val depth: Int
     )
+}
+
+private fun recycleNode(node: AccessibilityNodeInfo) {
+    try {
+        @Suppress("DEPRECATION")
+        node.recycle()
+    } catch (_: IllegalStateException) {
+    }
 }

@@ -1,8 +1,52 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="brand">#FFD54F</color>
-    <color name="brand_dark">#1A1A2E</color>
-    <color name="on_brand">#1A1A2E</color>
-    <color name="ic_launcher_background">#1A1A2E</color>
-    <color name="status_bg">#22000000</color>
+    <!-- Consumer-Friendly Calm Swiss Light Palette (WCAG AA/AAA verified) -->
+    <color name="ef_paper">#F4F6F9</color>
+    <color name="ef_panel">#FFFFFF</color>
+    <color name="ef_panel_subtle">#F8FAFC</color>
+    <color name="ef_ink">#111827</color>
+    <color name="ef_ink_2">#475569</color>
+    <color name="ef_rule">#E2E8F0</color>
+    <color name="ef_chip">#E8EEF5</color>
+    <color name="ef_signal">#1D4ED8</color>
+    <color name="ef_on_signal">#FFFFFF</color>
+    <color name="ef_signal_wipe_on_go">#1E40AF</color>
+    <color name="ef_trace">#1D4ED8</color>
+    <color name="ef_tag_bg">#EEF2FF</color>
+    <color name="ef_tag_fg">#1E40AF</color>
+    <color name="ef_danger">#B91C1C</color>
+    <color name="ef_danger_solid">#DC2626</color>
+    <color name="ef_danger_fg">#FFFFFF</color>
+    <color name="ef_scrim">#80111827</color>
+
+    <!-- Header Tokens (theme-matched, clean light top bar) -->
+    <color name="ef_command_bar">#FFFFFF</color>
+    <color name="ef_command_bar_ink">#111827</color>
+    <color name="ef_command_bar_muted">#475569</color>
+    <color name="ef_command_bar_rule">#E8EEF5</color>
+
+    <!-- Semantic Status Pill Tokens -->
+    <color name="fs_status_ok_bg">#E6F6EF</color>
+    <color name="fs_status_ok_fg">#046C4E</color>
+    <color name="fs_status_ok_dot">#10B981</color>
+    <color name="fs_status_warn_bg">#FEF3C7</color>
+    <color name="fs_status_warn_fg">#92400E</color>
+    <color name="fs_status_warn_dot">#D97706</color>
+    <color name="fs_status_paused_bg">#E2E8F0</color>
+    <color name="fs_status_paused_fg">#334155</color>
+    <color name="fs_status_paused_dot">#64748B</color>
+    <color name="fs_status_alert_bg">#FEE2E2</color>
+    <color name="fs_status_alert_fg">#991B1B</color>
+    <color name="fs_status_alert_dot">#DC2626</color>
+
+    <!-- In-App Floating Feedback Bar -->
+    <color name="fs_toast_bg">#1E293B</color>
+    <color name="fs_toast_fg">#F8FAFC</color>
+
+    <!-- Compatibility aliases -->
+    <color name="brand">@color/ef_signal</color>
+    <color name="brand_dark">@color/ef_command_bar</color>
+    <color name="on_brand">@color/ef_on_signal</color>
+    <color name="ic_launcher_background">#1D4ED8</color>
+    <color name="status_bg">@color/ef_panel</color>
 </resources>

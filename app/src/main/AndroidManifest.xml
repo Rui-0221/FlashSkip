@@ -43,7 +43,7 @@
                 android:resource="@xml/skip_ad_config" />
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Accessibility ad-skip service keepalive" />
+                android:value="User-enabled accessibility service that detects and skips opening ads while other apps are in use, with an ongoing notification and pause control" />
         </service>
     </application>
 

@@ -1,11 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <style name="ShapeAppearance.FlashSkip.Square" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">14dp</item>
+    </style>
+
     <style name="Theme.FlashSkip" parent="Theme.Material3.DayNight.NoActionBar">
-        <item name="colorPrimary">@color/brand</item>
-        <item name="colorPrimaryVariant">@color/brand_dark</item>
-        <item name="colorOnPrimary">@color/on_brand</item>
-        <item name="colorSecondary">@color/brand</item>
-        <item name="android:statusBarColor">@color/brand_dark</item>
+        <item name="colorPrimary">@color/ef_signal</item>
+        <item name="colorOnPrimary">@color/ef_on_signal</item>
+        <item name="colorSecondary">@color/ef_signal</item>
+        <item name="colorOnSecondary">@color/ef_on_signal</item>
+        <item name="android:colorBackground">@color/ef_paper</item>
+        <item name="colorSurface">@color/ef_panel</item>
+        <item name="colorOnBackground">@color/ef_ink</item>
+        <item name="colorOnSurface">@color/ef_ink</item>
+        <item name="colorOutline">@color/ef_rule</item>
+        <item name="colorError">@color/ef_danger</item>
+        <item name="android:windowBackground">@color/ef_paper</item>
+        <item name="android:statusBarColor">@color/ef_command_bar</item>
+        <item name="android:navigationBarColor">@color/ef_panel</item>
+        <item name="shapeAppearanceSmallComponent">@style/ShapeAppearance.FlashSkip.Square</item>
+        <item name="shapeAppearanceMediumComponent">@style/ShapeAppearance.FlashSkip.Square</item>
+        <item name="shapeAppearanceLargeComponent">@style/ShapeAppearance.FlashSkip.Square</item>
     </style>
 
     <style name="Theme.FlashSkip.Splash" parent="Theme.Material3.DayNight.NoActionBar">

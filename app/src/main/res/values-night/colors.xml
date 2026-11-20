@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Consumer-Friendly Dark Slate Palette (WCAG AA/AAA verified) -->
+    <color name="ef_paper">#0E1319</color>
+    <color name="ef_panel">#171F29</color>
+    <color name="ef_panel_subtle">#1E2835</color>
+    <color name="ef_ink">#F1F5F9</color>
+    <color name="ef_ink_2">#9FB0C4</color>
+    <color name="ef_rule">#2A3544</color>
+    <color name="ef_chip">#232E3C</color>
+    <color name="ef_signal">#2563EB</color>
+    <color name="ef_on_signal">#FFFFFF</color>
+    <color name="ef_signal_wipe_on_go">#1D4ED8</color>
+    <color name="ef_trace">#60A5FA</color>
+    <color name="ef_tag_bg">#1E3A5F</color>
+    <color name="ef_tag_fg">#BFDBFE</color>
+    <color name="ef_danger">#FCA5A5</color>
+    <color name="ef_danger_solid">#DC2626</color>
+    <color name="ef_danger_fg">#FFFFFF</color>
+    <color name="ef_scrim">#A6000000</color>
+
+    <!-- Header Tokens -->
+    <color name="ef_command_bar">#171F29</color>
+    <color name="ef_command_bar_ink">#F1F5F9</color>
+    <color name="ef_command_bar_muted">#9FB0C4</color>
+    <color name="ef_command_bar_rule">#232E3C</color>
+
+    <!-- Semantic Status Pill Tokens -->
+    <color name="fs_status_ok_bg">#0E3226</color>
+    <color name="fs_status_ok_fg">#6EE7B7</color>
+    <color name="fs_status_ok_dot">#34D399</color>
+    <color name="fs_status_warn_bg">#33240B</color>
+    <color name="fs_status_warn_fg">#FCD34D</color>
+    <color name="fs_status_warn_dot">#FBBF24</color>
+    <color name="fs_status_paused_bg">#24303F</color>
+    <color name="fs_status_paused_fg">#CBD5E1</color>
+    <color name="fs_status_paused_dot">#94A3B8</color>
+    <color name="fs_status_alert_bg">#3B1619</color>
+    <color name="fs_status_alert_fg">#FCA5A5</color>
+    <color name="fs_status_alert_dot">#F87171</color>
+
+    <!-- In-App Floating Feedback Bar -->
+    <color name="fs_toast_bg">#F1F5F9</color>
+    <color name="fs_toast_fg">#0F172A</color>
+</resources>

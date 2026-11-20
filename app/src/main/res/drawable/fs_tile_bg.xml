@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/ef_panel_subtle" />
+    <corners android:radius="@dimen/fs_inner_radius" />
+    <stroke
+        android:width="@dimen/ef_hairline"
+        android:color="@color/ef_rule" />
+</shape>

@@ -1,0 +1,1998 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <!-- ==================== TAB 0: 首页（当前状态、总开关、下一步、简明统计） ==================== -->
+    <LinearLayout
+        android:id="@+id/panelTabHome"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="@dimen/ef_page_pad"
+        android:paddingTop="16dp"
+        android:paddingEnd="@dimen/ef_page_pad"
+        android:paddingBottom="28dp"
+        android:visibility="visible">
+
+        <!-- 0. Endfield Hero Wordmark Header (only shown when Endfield UI theme is selected) -->
+        <LinearLayout
+            android:id="@+id/efHomeDisplayHeader"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="14dp"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/efHomeEyebrowTop"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="// LOCAL GUARD │ OFFLINE"
+                android:textSize="11sp" />
+
+            <TextView
+                android:id="@+id/efHomeWordmark"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="FLASHSKIP"
+                android:textSize="32sp" />
+
+            <TextView
+                android:id="@+id/efHomeSubheadline"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="自动跳过开屏广告控制台"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- 1. Hero Protection Status Card -->
+        <LinearLayout
+            android:id="@+id/serviceStatusPanel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/ef_panel_bg"
+            android:orientation="vertical"
+            android:padding="18dp">
+
+            <TextView
+                android:id="@+id/efEyebrowHero"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="6dp"
+                android:text="// STATUS"
+                android:textSize="11sp"
+                android:visibility="gone" />
+
+            <com.flashskip.ui.EfWrapLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:efHorizontalGap="8dp"
+                app:efVerticalGap="8dp">
+
+                <TextView
+                    android:id="@+id/tvStatusBadge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/ef_state_alert_bg"
+                    android:paddingStart="12dp"
+                    android:paddingTop="5dp"
+                    android:paddingEnd="12dp"
+                    android:paddingBottom="5dp"
+                    android:text="@string/badge_disabled"
+                    android:textColor="@color/fs_status_alert_fg"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvKeepAliveBadge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/fs_tile_bg"
+                    android:paddingStart="10dp"
+                    android:paddingTop="5dp"
+                    android:paddingEnd="10dp"
+                    android:paddingBottom="5dp"
+                    android:text="后台保活待检查"
+                    android:textColor="@color/ef_ink_2"
+                    android:textSize="12.5sp" />
+            </com.flashskip.ui.EfWrapLayout>
+
+            <TextView
+                android:id="@+id/tvStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:lineSpacingMultiplier="1.3"
+                android:text="@string/status_disabled"
+                android:textColor="@color/ef_ink"
+                android:textSize="19sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvHeroDesc"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:lineSpacingMultiplier="1.45"
+                android:text="开启后，在您打开其他软件遇到开屏广告时，会自动帮您点掉“跳过”按钮。"
+                android:textColor="@color/ef_ink_2"
+                android:textSize="14sp" />
+
+            <!-- Contextual Tip Banner (Android 13+ restricted settings / Observe warning / Reconnect note) -->
+            <LinearLayout
+                android:id="@+id/noticeActionBanner"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:background="@drawable/fs_tile_bg"
+                android:orientation="horizontal"
+                android:padding="12dp"
+                android:visibility="gone">
+
+                <View
+                    android:id="@+id/vNoticeAccent"
+                    android:layout_width="4dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginEnd="10dp"
+                    android:background="@color/ef_signal"
+                    android:importantForAccessibility="no" />
+
+                <TextView
+                    android:id="@+id/tvNoticeFlag"
+                    android:layout_width="28dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginEnd="10dp"
+                    android:background="#FFFA00"
+                    android:gravity="center"
+                    android:text="!"
+                    android:textColor="#161616"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/tvNextStepHint"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:lineSpacingMultiplier="1.45"
+                    android:textColor="@color/ef_ink"
+                    android:textSize="13.5sp" />
+            </LinearLayout>
+
+            <com.flashskip.ui.EfButton
+                android:id="@+id/btnEnable"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="@string/btn_enable"
+                android:textSize="15.5sp"
+                app:efKind="go" />
+
+            <com.flashskip.ui.EfButton
+                android:id="@+id/btnHomeSecondary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="@string/btn_restricted_settings"
+                android:textSize="14sp"
+                android:visibility="gone"
+                app:efKind="normal" />
+        </LinearLayout>
+
+        <!-- 2. Core User Controls Card -->
+        <LinearLayout
+            android:id="@+id/cardHomeControls"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/ef_panel_bg"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/efEyebrowControls"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="18dp"
+                android:layout_marginTop="14dp"
+                android:text="// CONTROLS"
+                android:textSize="11sp"
+                android:visibility="gone" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingStart="18dp"
+                android:paddingTop="12dp"
+                android:paddingEnd="18dp"
+                android:paddingBottom="14dp">
+
+                <androidx.appcompat.widget.SwitchCompat
+                    android:id="@+id/swMaster"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="48dp"
+                    android:text="@string/master_switch"
+                    android:textColor="@color/ef_ink"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:thumb="@drawable/ef_switch_thumb"
+                    app:showText="false"
+                    app:switchMinWidth="52dp"
+                    app:switchPadding="12dp"
+                    app:thumbTint="@null"
+                    app:track="@drawable/ef_switch_track"
+                    app:trackTint="@null" />
+
+                <TextView
+                    android:id="@+id/tvMasterSummary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:lineSpacingMultiplier="1.4"
+                    android:text="开启后，打开其他应用时会自动识别并点击开屏上的“跳过”按钮。不需要时可以随时在这里暂停。"
+                    android:textColor="@color/ef_ink_2"
+                    android:textSize="13.5sp" />
+            </LinearLayout>
+
+            <View
+                android:id="@+id/ctrlDivider"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/ef_hairline"
+                android:layout_marginStart="18dp"
+                android:layout_marginEnd="18dp"
+                android:background="@color/ef_rule" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingStart="18dp"
+                android:paddingTop="12dp"
+                android:paddingEnd="18dp"
+                android:paddingBottom="14dp">
+
+                <androidx.appcompat.widget.SwitchCompat
+                    android:id="@+id/swSkipToast"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="48dp"
+                    android:text="@string/skip_toast_switch"
+                    android:textColor="@color/ef_ink"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    android:thumb="@drawable/ef_switch_thumb"
+                    app:showText="false"
+                    app:switchMinWidth="52dp"
+                    app:switchPadding="12dp"
+                    app:thumbTint="@null"
+                    app:track="@drawable/ef_switch_track"
+                    app:trackTint="@null" />
+
+                <TextView
+                    android:id="@+id/tvSkipToastDesc"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:lineSpacingMultiplier="1.4"
+                    android:text="成功关闭开屏广告后，在屏幕下方短暂提示“FlashSkip 已跳过广告”，不影响滑动和点击。"
+                    android:textColor="@color/ef_ink_2"
+                    android:textSize="13.5sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- 3. Long-Term Keep-Alive Summary Card -->
+        <LinearLayout
+            android:id="@+id/homeKeepAliveCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/ef_panel_bg"
+            android:orientation="vertical"
+            android:padding="18dp">
+
+            <TextView
+                android:id="@+id/efEyebrowHomeKa"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="4dp"
+                android:text="// PROTECTION"
+                android:textSize="11sp"
+                android:visibility="gone" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/tvHomeKeepAliveTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="后台常驻保护"
+                    android:textColor="@color/ef_ink"
+                    android:textSize="16.5sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvReadinessText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0 / 4 已就绪"
+                    android:textColor="@color/ef_ink_2"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <com.flashskip.ui.EfSegmentBarView
+                android:id="@+id/segReadiness"
+                android:layout_width="match_parent"
+                android:layout_height="8dp"
+                android:layout_marginTop="10dp" />
+
+            <TextView
+                android:id="@+id/tvHomeKeepAliveSummary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:lineSpacingMultiplier="1.45"
+                android:text="手机息屏或闲置几小时后，系统常会自动休眠后台应用。建议完成保活设置，保证全天稳定跳过。"
+                android:textColor="@color/ef_ink_2"
+                android:textSize="13.5sp" />
+
+            <com.flashskip.ui.EfWrapLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                app:efHorizontalGap="8dp"
+                app:efVerticalGap="8dp">
+
+                <TextView
+                    android:id="@+id/tvHomeCheckA11y"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/fs_tile_bg"
+                    android:paddingStart="10dp"
+                    android:paddingTop="5dp"
+                    android:paddingEnd="10dp"
+                    android:paddingBottom="5dp"
+                    android:text="无障碍：未开启"
+                    android:textColor="@color/ef_ink"
+                    android:textSize="12.5sp" />
+
+                <TextView
+                    android:id="@+id/tvHomeCheckNotif"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/fs_tile_bg"
+                    android:paddingStart="10dp"
+                    android:paddingTop="5dp"
+                    android:paddingEnd="10dp"
+                    android:paddingBottom="5dp"
+                    android:text="守护通知：未开启"
+                    android:textColor="@color/ef_ink"
+                    android:textSize="12.5sp" />
+
+                <TextView
+                    android:id="@+id/tvHomeCheckBattery"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/fs_tile_bg"
+                    android:paddingStart="10dp"
+                    android:paddingTop="5dp"
+                    android:paddingEnd="10dp"
+                    android:paddingBottom="5dp"
+                    android:text="电池限制：待设置"
+                    android:textColor="@color/ef_ink"
+                    android:textSize="12.5sp" />
+
+                <TextView
+                    android:id="@+id/tvHomeCheckBg"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/fs_tile_bg"
+                    android:paddingStart="10dp"
+                    android:paddingTop="5dp"
+                    android:paddingEnd="10dp"
+                    android:paddingBottom="5dp"
+                    android:text="后台运行：正常"
+                    android:textColor="@color/ef_ink"
+                    android:textSize="12.5sp" />
+            </com.flashskip.ui.EfWrapLayout>
+
+            <com.flashskip.ui.EfButton
+                android:id="@+id/btnGoKeepAlive"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:text="确保它在后台稳定运行（查看向导）"
+                android:textSize="14.5sp"
+                app:efKind="normal" />
+        </LinearLayout>
+
+        <!-- 4. Friendly Everyday Skip Stats Card -->
+        <LinearLayout
+            android:id="@+id/telemetryPanel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/ef_panel_bg"
+            android:orientation="vertical"
+            android:padding="18dp">
+
+            <TextView
+                android:id="@+id/efEyebrowStats"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="4dp"
+                android:text="// METRICS"
+                android:textSize="11sp"
+                android:visibility="gone" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/tvStatsCardTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="为您跳过的广告"
+                    android:textColor="@color/ef_ink"
+                    android:textSize="16.5sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvStatsCardPrivate"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="仅保存在本机"
+                    android:textColor="@color/ef_ink_2"
+                    android:textSize="12.5sp" />
+            </LinearLayout>
+
+            <!-- Empty State (supports Classic soft box and Endfield 45-deg hatched box) -->
+            <FrameLayout
+                android:id="@+id/emptyStatsBox"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/fs_tile_bg"
+                android:visibility="visible">
+
+                <com.flashskip.ui.EfHatchView
+                    android:id="@+id/hatchEmptyStats"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:visibility="gone"
+                    app:efHatchBordered="true" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:id="@+id/tvEmptyStatsText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:lineSpacingMultiplier="1.45"
+                        android:text="@string/stats_empty"
+                        android:textColor="@color/ef_ink_2"
+                        android:textSize="14sp" />
+
+                    <TextView
+                        android:id="@+id/tvStatLegacyEmpty"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:textColor="@color/ef_ink_2"
+                        android:textSize="12.5sp"
+                        android:visibility="gone" />
+                </LinearLayout>
+            </FrameLayout>
+
+            <!-- Clean Two-Column Today & Total Skip Tiles -->
+            <LinearLayout
+                android:id="@+id/homeStatsTiles"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="horizontal"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:id="@+id/statTodayTile"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:background="@drawable/fs_tile_bg"
+                    android:orientation="vertical"
+                    android:padding="14dp">
+
+                    <TextView
+                        android:id="@+id/tvStatToday"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0"
+                        android:textColor="@color/ef_ink"
+                        android:textSize="28sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvStatTodayLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="今日已跳过（次）"
+                        android:textColor="@color/ef_ink_2"
+                        android:textSize="13sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/statTotalTile"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/fs_tile_bg"
+                    android:orientation="vertical"
+                    android:padding="14dp">
+
+                    <TextView
+                        android:id="@+id/tvStatTotal"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0"
+                        android:textColor="@color/ef_ink"
+                        android:textSize="28sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvStatTotalLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="累计已跳过（次）"
+                        android:textColor="@color/ef_ink_2"
+                        android:textSize="13sp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/btnViewDetailedStats"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/ef_focus_row_bg"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:minHeight="48dp"
+                android:paddingStart="6dp"
+                android:paddingEnd="10dp"
+                android:text="查看详细响应速度与测试工具 →"
+                android:textColor="@color/ef_signal"
+                android:textSize="13.5sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- ==================== TAB 1: 后台保活（确保 1-24 小时长期有效 + 品牌直达与分步指引） ==================== -->
+    <LinearLayout
+        android:id="@+id/panelTabKeepAlive"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="@dimen/ef_page_pad"
+        android:paddingTop="16dp"
+        android:paddingEnd="@dimen/ef_page_pad"
+        android:paddingBottom="28dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/efEyebrowKaPage"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="4dp"
+            android:text="// KEEP ALIVE"
+            android:textSize="11sp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/tvTitleKeepAlive"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="后台常驻与保活设置"
+            android:textColor="@color/ef_ink"
+            android:textSize="21sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvDescKeepAlive"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:lineSpacingMultiplier="1.45"
+            android:text="手机锁屏或放几个小时后，系统常会把后台软件清理掉。把下面 4 项逐一设为开启或允许，闪跳就能整天稳稳工作。"
+            android:textColor="@color/ef_ink_2"
+            android:textSize="14sp" />
+
+        <!-- 4-Step Interactive Checklist Card -->
+        <LinearLayout
+            android:id="@+id/cardKaChecklist"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:background="@drawable/ef_panel_bg"
+            android:orientation="vertical"
+            android:padding="18dp">
+
+            <!-- Item 1: Accessibility -->
+            <com.flashskip.ui.EfWrapLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:efHorizontalGap="8dp"
+                app:efVerticalGap="6dp">
+
+                <TextView
+                    android:id="@+id/tvKaItem1Title"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="1. 开启无障碍服务"
+                    android:textColor="@color/ef_ink"
+                    android:textSize="15.5sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvKaA11yBadge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/ef_state_alert_bg"
+                    android:paddingStart="10dp"
+                    android:paddingTop="3dp"
+                    android:paddingEnd="10dp"
+                    android:paddingBottom="3dp"
+                    android:text="未开启"
+                    android:textColor="@color/fs_status_alert_fg"
+                    android:textSize="12.5sp"
+                    android:textStyle="bold" />
+            </com.flashskip.ui.EfWrapLayout>
+
+            <TextView
+                android:id="@+id/tvKaA11yDesc"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:lineSpacingMultiplier="1.45"
+                android:text="没有开启它就无法自动点击“跳过”。如果系统里开关是灰色的点不了，先点下方“解除受限设置”。"
+                android:textColor="@color/ef_ink_2"
+                android:textSize="13.5sp" />
+
+            <com.flashskip.ui.EfWrapLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                app:efHorizontalGap="8dp"
+                app:efVerticalGap="8dp">
+
+                <com.flashskip.ui.EfButton
+                    android:id="@+id/btnKaAccessibility"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="前往无障碍"
+                    android:textSize="14sp"
+                    app:efKind="normal"
+                    app:efSmall="true" />
+
+                <com.flashskip.ui.EfButton
+                    android:id="@+id/btnRestrictedSettings"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="解除受限设置"
+                    android:textSize="14sp"
+                    app:efKind="normal"
+                    app:efSmall="true" />
+            </com.flashskip.ui.EfWrapLayout>
+
+            <View
+                android:id="@+id/kaDivider1"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/ef_hairline"
+                android:layout_marginTop="16dp"
+                android:layout_marginBottom="16dp"
+                android:background="@color/ef_rule" />
+
+            <!-- Item 2: Foreground Notification -->
+            <com.flashskip.ui.EfWrapLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:efHorizontalGap="8dp"
+                app:efVerticalGap="6dp">
+
+                <TextView
+                    android:id="@+id/tvKaItem2Title"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="2. 允许状态栏通知"
+                    android:textColor="@color/ef_ink"
+                    android:textSize="15.5sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvKaNotifBadge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/ef_state_dashed_bg"
+                    android:paddingStart="10dp"
+                    android:paddingTop="3dp"
+                    android:paddingEnd="10dp"
+                    android:paddingBottom="3dp"
+                    android:text="待开启"
+                    android:textColor="@color/fs_status_warn_fg"
+                    android:textSize="12.5sp"
+                    android:textStyle="bold" />
+            </com.flashskip.ui.EfWrapLayout>
+
+            <TextView
+                android:id="@+id/tvKaNotifDesc"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:lineSpacingMultiplier="1.45"
+                android:text="在通知栏保留一条静默提示（不响铃不震动），能明显减少被系统误杀，还能确保正常显示跳过成功轻提示。"
+                android:textColor="@color/ef_ink_2"
+                android:textSize="13.5sp" />
+
+            <com.flashskip.ui.EfWrapLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                app:efHorizontalGap="8dp"
+                app:efVerticalGap="8dp">
+
+                <com.flashskip.ui.EfButton
+                    android:id="@+id/btnKaNotification"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="允许状态栏通知"
+                    android:textSize="14sp"
+                    app:efKind="normal"
+                    app:efSmall="true" />
+            </com.flashskip.ui.EfWrapLayout>
+
+            <View
+                android:id="@+id/kaDivider2"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/ef_hairline"
+                android:layout_marginTop="16dp"
+                android:layout_marginBottom="16dp"
+                android:background="@color/ef_rule" />
+
+            <!-- Item 3: Battery Optimization -->
+            <com.flashskip.ui.EfWrapLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:efHorizontalGap="8dp"
+                app:efVerticalGap="6dp">
+
+                <TextView
+                    android:id="@+id/tvKaItem3Title"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="3. 电池设为无限制"
+                    android:textColor="@color/ef_ink"
+                    android:textSize="15.5sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvKaBatteryBadge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/ef_state_dashed_bg"
+                    android:paddingStart="10dp"
+                    android:paddingTop="3dp"
+                    android:paddingEnd="10dp"
+                    android:paddingBottom="3dp"
+                    android:text="受限"
+                    android:textColor="@color/fs_status_warn_fg"
+                    android:textSize="12.5sp"
+                    android:textStyle="bold" />
+            </com.flashskip.ui.EfWrapLayout>
+
+            <TextView
+                android:id="@+id/tvKaBatteryDesc"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:lineSpacingMultiplier="1.45"
+                android:text="让手机系统不要因为省电，在息屏一两个小时后悄悄关闭闪跳服务。"
+                android:textColor="@color/ef_ink_2"
+                android:textSize="13.5sp" />
+
+            <com.flashskip.ui.EfButton
+                android:id="@+id/btnBatteryOpt"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="@string/btn_battery_opt"
+                android:textSize="14.5sp"
+                app:efKind="normal" />
+
+            <View
+                android:id="@+id/kaDivider3"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/ef_hairline"
+                android:layout_marginTop="16dp"
+                android:layout_marginBottom="16dp"
+                android:background="@color/ef_rule" />
+
+            <!-- Item 4: OEM Auto-start & Background Management -->
+            <com.flashskip.ui.EfWrapLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:efHorizontalGap="8dp"
+                app:efVerticalGap="6dp">
+
+                <TextView
+                    android:id="@+id/tvKaItem4Title"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="4. 手机后台与自启动"
+                    android:textColor="@color/ef_ink"
+                    android:textSize="15.5sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvKaBgBadge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/fs_tile_bg"
+                    android:paddingStart="10dp"
+                    android:paddingTop="3dp"
+                    android:paddingEnd="10dp"
+                    android:paddingBottom="3dp"
+                    android:text="需手动确认"
+                    android:textColor="@color/ef_ink_2"
+                    android:textSize="12.5sp"
+                    android:textStyle="bold" />
+            </com.flashskip.ui.EfWrapLayout>
+
+            <TextView
+                android:id="@+id/tvKaBgDesc"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:lineSpacingMultiplier="1.45"
+                android:text="国产手机（如荣耀、华为、小米、OPPO、vivo）需在系统“应用启动管理/自启动”里关闭自动管理并允许后台活动，才能持久有效。"
+                android:textColor="@color/ef_ink_2"
+                android:textSize="13.5sp" />
+
+            <com.flashskip.ui.EfButton
+                android:id="@+id/btnOemBackground"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="去打开手机后台保活设置"
+                android:textSize="15sp"
+                app:efKind="go" />
+
+            <LinearLayout
+                android:id="@+id/kaJumpFeedbackBanner"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/fs_tile_bg"
+                android:orientation="horizontal"
+                android:padding="12dp"
+                android:visibility="gone">
+
+                <View
+                    android:id="@+id/vKaFeedbackBar"
+                    android:layout_width="4dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginEnd="10dp"
+                    android:background="@color/ef_signal"
+                    android:importantForAccessibility="no" />
+
+                <TextView
+                    android:id="@+id/tvKaFeedbackFlag"
+                    android:layout_width="28dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginEnd="10dp"
+                    android:background="#FFFA00"
+                    android:gravity="center"
+                    android:text="!"
+                    android:textColor="#161616"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/tvKaJumpFeedback"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:lineSpacingMultiplier="1.45"
+                    android:textColor="@color/ef_ink"
+                    android:textSize="13.5sp" />
+            </LinearLayout>
+
+            <com.flashskip.ui.EfButton
+                android:id="@+id/btnKaAppDetails"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="打开应用信息页（手动改电池/权限）"
+                android:textSize="13.5sp"
+                app:efKind="normal"
+                app:efSmall="true" />
+        </LinearLayout>
+
+        <!-- Step-by-Step Brand Guide Card -->
+        <LinearLayout
+            android:id="@+id/keepAliveGuideCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/ef_panel_bg"
+            android:orientation="vertical"
+            android:padding="18dp">
+
+            <TextView
+                android:id="@+id/efEyebrowKaGuide"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="4dp"
+                android:text="// GUIDE STEPS"
+                android:textSize="11sp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/tvKeepAliveBrandTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="本机分步设置操作指南"
+                android:textColor="@color/ef_ink"
+                android:textSize="16.5sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvKeepAliveGuideDesc"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:lineSpacingMultiplier="1.45"
+                android:text="如果点上方按钮无法一步直达，或者进去后不知道开哪几项，请照着下面每一步操作："
+                android:textColor="@color/ef_ink_2"
+                android:textSize="13.5sp" />
+
+            <LinearLayout
+                android:id="@+id/keepAliveStepsContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="vertical" />
+
+            <TextView
+                android:id="@+id/tvKeepAliveInfo"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:lineSpacingMultiplier="1.4"
+                android:textColor="@color/ef_ink_2"
+                android:textSize="12.5sp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/btnBrowseOtherBrands"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/ef_focus_row_bg"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:minHeight="48dp"
+                android:paddingStart="6dp"
+                android:paddingEnd="10dp"
+                android:text="查看其他品牌手机设置方法 →"
+                android:textColor="@color/ef_signal"
+                android:textSize="13.5sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- ==================== TAB 2: 更多设置（名单、外观、隐私说明、及低层级高级/测试/日志工具） ==================== -->
+    <LinearLayout
+        android:id="@+id/panelTabMore"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="@dimen/ef_page_pad"
+        android:paddingTop="16dp"
+        android:paddingEnd="@dimen/ef_page_pad"
+        android:paddingBottom="28dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/efEyebrowMorePage"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="4dp"
+            android:text="// CONFIG"
+            android:textSize="11sp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/tvTitleMore"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="更多设置与工具"
+            android:textColor="@color/ef_ink"
+            android:textSize="21sp"
+            android:textStyle="bold" />
+
+        <!-- 1. Exclusions Card -->
+        <LinearLayout
+            android:id="@+id/sectionExclusions"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:background="@drawable/ef_panel_bg"
+            android:orientation="vertical"
+            android:padding="18dp">
+
+            <TextView
+                android:id="@+id/efEyebrowExclusions"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="4dp"
+                android:text="// EXCLUSIONS"
+                android:textSize="11sp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/tvExclusionsCardTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="哪些应用不跳过广告"
+                android:textColor="@color/ef_ink"
+                android:textSize="16.5sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvBuiltInExclusions"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:lineSpacingMultiplier="1.45"
+                android:textColor="@color/ef_ink_2"
+                android:textSize="13.5sp" />
+
+            <View
+                android:id="@+id/exclDivider"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/ef_hairline"
+                android:layout_marginTop="14dp"
+                android:layout_marginBottom="14dp"
+                android:background="@color/ef_rule" />
+
+            <TextView
+                android:id="@+id/tvCustomExclusionsHeader"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="我添加的不跳过应用（0）"
+                android:textColor="@color/ef_ink"
+                android:textSize="14.5sp"
+                android:textStyle="bold" />
+
+            <FrameLayout
+                android:id="@+id/emptyExclusionsBox"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/fs_tile_bg"
+                android:visibility="visible">
+
+                <com.flashskip.ui.EfHatchView
+                    android:id="@+id/hatchEmptyExclusions"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:visibility="gone"
+                    app:efHatchBordered="true" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="14dp">
+
+                    <TextView
+                        android:id="@+id/tvEmptyExclusionsText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:lineSpacingMultiplier="1.4"
+                        android:text="@string/exclusions_empty"
+                        android:textColor="@color/ef_ink_2"
+                        android:textSize="13.5sp" />
+                </LinearLayout>
+            </FrameLayout>
+
+            <LinearLayout
+                android:id="@+id/customExclusionsList"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="vertical"
+                android:visibility="gone" />
+
+            <com.flashskip.ui.EfWrapLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                app:efHorizontalGap="8dp"
+                app:efVerticalGap="8dp">
+
+                <com.flashskip.ui.EfButton
+                    android:id="@+id/btnAddExclusionInline"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="添加不想跳过的应用"
+                    android:textSize="14sp"
+                    app:efKind="go"
+                    app:efSmall="true" />
+
+                <com.flashskip.ui.EfButton
+                    android:id="@+id/btnExclusions"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/btn_exclusions"
+                    android:textSize="14sp"
+                    app:efKind="normal"
+                    app:efSmall="true" />
+            </com.flashskip.ui.EfWrapLayout>
+        </LinearLayout>
+
+        <!-- 2. Appearance Card (Dual Visual Style + Light/Dark Mode) -->
+        <LinearLayout
+            android:id="@+id/cardAppearance"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/ef_panel_bg"
+            android:orientation="vertical"
+            android:padding="18dp">
+
+            <TextView
+                android:id="@+id/efEyebrowStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="4dp"
+                android:text="// APPEARANCE"
+                android:textSize="11sp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/tvAppearanceTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="界面外观"
+                android:textColor="@color/ef_ink"
+                android:textSize="16.5sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvAppearanceDesc"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:lineSpacingMultiplier="1.4"
+                android:text="可切换「日常简约」或「终末地」两套界面风格，均支持浅色、深色与跟随系统。"
+                android:textColor="@color/ef_ink_2"
+                android:textSize="13.5sp" />
+
+            <TextView
+                android:id="@+id/tvThemeStyleLabel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="界面风格"
+                android:textColor="@color/ef_ink"
+                android:textSize="13.5sp"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:id="@+id/segStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/fs_tile_bg"
+                android:orientation="horizontal"
+                android:padding="4dp">
+
+                <TextView
+                    android:id="@+id/segStyleClassic"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:minHeight="48dp"
+                    android:paddingStart="8dp"
+                    android:paddingTop="8dp"
+                    android:paddingEnd="8dp"
+                    android:paddingBottom="8dp"
+                    android:text="日常简约"
+                    android:textColor="@color/ef_ink"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:id="@+id/segStyleEndfield"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:layout_weight="1"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:minHeight="48dp"
+                    android:paddingStart="8dp"
+                    android:paddingTop="8dp"
+                    android:paddingEnd="8dp"
+                    android:paddingBottom="8dp"
+                    android:text="终末地"
+                    android:textColor="@color/ef_ink"
+                    android:textSize="14sp" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tvStyleActiveDesc"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="当前为日常简约风格：圆润卡片、柔和留白与清晰配色"
+                android:textColor="@color/ef_ink_2"
+                android:textSize="12.5sp" />
+
+            <TextView
+                android:id="@+id/tvThemeModeLabel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:text="明暗配色"
+                android:textColor="@color/ef_ink"
+                android:textSize="13.5sp"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:id="@+id/segTheme"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/fs_tile_bg"
+                android:orientation="horizontal"
+                android:padding="4dp">
+
+                <TextView
+                    android:id="@+id/segThemeSystem"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:minHeight="48dp"
+                    android:paddingStart="8dp"
+                    android:paddingTop="8dp"
+                    android:paddingEnd="8dp"
+                    android:paddingBottom="8dp"
+                    android:text="跟随系统"
+                    android:textColor="@color/ef_ink"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:id="@+id/segThemeLight"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:layout_weight="1"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:minHeight="48dp"
+                    android:paddingStart="8dp"
+                    android:paddingTop="8dp"
+                    android:paddingEnd="8dp"
+                    android:paddingBottom="8dp"
+                    android:text="浅色"
+                    android:textColor="@color/ef_ink"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:id="@+id/segThemeDark"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:layout_weight="1"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:minHeight="48dp"
+                    android:paddingStart="8dp"
+                    android:paddingTop="8dp"
+                    android:paddingEnd="8dp"
+                    android:paddingBottom="8dp"
+                    android:text="深色"
+                    android:textColor="@color/ef_ink"
+                    android:textSize="14sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- 3. Privacy & Safety Guide Card -->
+        <LinearLayout
+            android:id="@+id/cardPrivacySafety"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/ef_panel_bg"
+            android:orientation="vertical"
+            android:padding="18dp">
+
+            <TextView
+                android:id="@+id/efEyebrowPrivacy"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="4dp"
+                android:text="// PRIVACY"
+                android:textSize="11sp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/tvPrivacyTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="隐私保护与防误触说明"
+                android:textColor="@color/ef_ink"
+                android:textSize="16.5sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvSafetyGuide"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:lineSpacingMultiplier="1.55"
+                android:text="@string/guide"
+                android:textColor="@color/ef_ink_2"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <!-- 4. Lower-Hierarchy Collapsible Card: Advanced Timing, Simulation Tests & Diagnostic Logs -->
+        <LinearLayout
+            android:id="@+id/advancedToolsCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/ef_panel_bg"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:id="@+id/btnToggleAdvancedTools"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/ef_focus_row_bg"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:minHeight="56dp"
+                android:orientation="horizontal"
+                android:padding="18dp">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/efEyebrowAdvanced"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="4dp"
+                        android:text="// DIAGNOSTICS"
+                        android:textSize="11sp"
+                        android:visibility="gone" />
+
+                    <TextView
+                        android:id="@+id/tvAdvancedTitle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="高级调节、效果测试与运行记录"
+                        android:textColor="@color/ef_ink"
+                        android:textSize="15.5sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvAdvancedSub"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="普通用户无需改动 · 包含模拟广告测试、等待时长调节与排查日志"
+                        android:textColor="@color/ef_ink_2"
+                        android:textSize="12.5sp" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/tvAdvancedToolsArrow"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:text="展开"
+                    android:textColor="@color/ef_signal"
+                    android:textSize="13.5sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/advancedToolsContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingStart="18dp"
+                android:paddingEnd="18dp"
+                android:paddingBottom="18dp"
+                android:visibility="gone">
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/ef_hairline"
+                    android:layout_marginBottom="16dp"
+                    android:background="@color/ef_rule" />
+
+                <!-- Sub-section A: Test Simulation -->
+                <LinearLayout
+                    android:id="@+id/sectionTestLab"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="效果测试体验"
+                        android:textColor="@color/ef_ink"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:lineSpacingMultiplier="1.4"
+                        android:text="不用等真实软件出广告，随时可以启动模拟页面，验证自动跳过是否生效以及防误触保护。"
+                        android:textColor="@color/ef_ink_2"
+                        android:textSize="13sp" />
+
+                    <com.flashskip.ui.EfWrapLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        app:efHorizontalGap="8dp"
+                        app:efVerticalGap="8dp">
+
+                        <com.flashskip.ui.EfButton
+                            android:id="@+id/btnTest"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/btn_test"
+                            android:textSize="13.5sp"
+                            app:efKind="normal"
+                            app:efSmall="true" />
+
+                        <com.flashskip.ui.EfButton
+                            android:id="@+id/btnTestLab"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/btn_test_lab"
+                            android:textSize="13.5sp"
+                            app:efKind="normal"
+                            app:efSmall="true" />
+                    </com.flashskip.ui.EfWrapLayout>
+
+                    <TextView
+                        android:id="@+id/btnToggleTestLabList"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:background="@drawable/ef_focus_row_bg"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:minHeight="48dp"
+                        android:paddingStart="6dp"
+                        android:paddingEnd="10dp"
+                        android:text="展开全部 20 项测试列表 ▾"
+                        android:textColor="@color/ef_signal"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    <LinearLayout
+                        android:id="@+id/testLabListContainer"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:orientation="vertical"
+                        android:visibility="gone" />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/ef_hairline"
+                    android:layout_marginTop="16dp"
+                    android:layout_marginBottom="16dp"
+                    android:background="@color/ef_rule" />
+
+                <!-- Sub-section B: Window Duration Timing -->
+                <TextView
+                    android:id="@+id/tvWindow"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/window_label"
+                    android:textColor="@color/ef_ink"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <com.flashskip.ui.EfSegmentBarView
+                    android:id="@+id/segWindowBar"
+                    android:layout_width="match_parent"
+                    android:layout_height="8dp"
+                    android:layout_marginTop="10dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <com.flashskip.ui.EfButton
+                        android:id="@+id/btnWindowMinus"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:contentDescription="缩短等待识别时间 1 秒"
+                        android:text="-1秒"
+                        android:textSize="13sp"
+                        app:efKind="normal"
+                        app:efSmall="true" />
+
+                    <SeekBar
+                        android:id="@+id/sbWindow"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:layout_marginEnd="6dp"
+                        android:layout_weight="1"
+                        android:contentDescription="调整打开应用后等待跳过的时间（3 到 15 秒）"
+                        android:max="12"
+                        android:minHeight="48dp"
+                        android:progress="3"
+                        android:progressDrawable="@drawable/ef_seekbar_progress"
+                        android:splitTrack="false"
+                        android:thumb="@drawable/ef_seekbar_thumb" />
+
+                    <com.flashskip.ui.EfButton
+                        android:id="@+id/btnWindowPlus"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:contentDescription="延长等待识别时间 1 秒"
+                        android:text="+1秒"
+                        android:textSize="13sp"
+                        app:efKind="normal"
+                        app:efSmall="true" />
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:lineSpacingMultiplier="1.4"
+                    android:text="每次打开软件时只在这个时长内寻找“跳过”按钮（默认 6 秒，开屏广告页会自动延至 10 秒），超时后自动休息以节省电量。"
+                    android:textColor="@color/ef_ink_2"
+                    android:textSize="13sp" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/ef_hairline"
+                    android:layout_marginTop="16dp"
+                    android:layout_marginBottom="16dp"
+                    android:background="@color/ef_rule" />
+
+                <!-- Sub-section C: Detailed Telemetry (demoted from Home) -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/tvTelemetryHeaderText"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="详细响应速度与统计"
+                        android:textColor="@color/ef_ink"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvStatSampleCount"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0 次记录"
+                        android:textColor="@color/ef_ink_2"
+                        android:textSize="12.5sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/telemetryDataGroup"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:background="@drawable/fs_tile_bg"
+                    android:orientation="vertical"
+                    android:padding="14dp"
+                    android:visibility="gone">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="常见跳过耗时（中位）"
+                            android:textColor="@color/ef_ink_2"
+                            android:textSize="13sp" />
+
+                        <TextView
+                            android:id="@+id/tvStatP50"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="记录不足"
+                            android:textColor="@color/ef_ink"
+                            android:textSize="13sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="较慢情况耗时（95%分位）"
+                            android:textColor="@color/ef_ink_2"
+                            android:textSize="13sp" />
+
+                        <TextView
+                            android:id="@+id/tvStatP95"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="记录不足"
+                            android:textColor="@color/ef_ink"
+                            android:textSize="13sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="点击后页面未关闭次数"
+                            android:textColor="@color/ef_ink_2"
+                            android:textSize="13sp" />
+
+                        <TextView
+                            android:id="@+id/tvStatStillPresent"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="0 次"
+                            android:textColor="@color/ef_ink"
+                            android:textSize="13sp" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="点击后跳转页面次数"
+                            android:textColor="@color/ef_ink_2"
+                            android:textSize="13sp" />
+
+                        <TextView
+                            android:id="@+id/tvStatNavigated"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:paddingStart="6dp"
+                            android:paddingEnd="6dp"
+                            android:text="0 次"
+                            android:textColor="@color/ef_ink"
+                            android:textSize="13sp" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="未能确认结果次数"
+                            android:textColor="@color/ef_ink_2"
+                            android:textSize="13sp" />
+
+                        <TextView
+                            android:id="@+id/tvStatUnobserved"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="0 次"
+                            android:textColor="@color/ef_ink"
+                            android:textSize="13sp" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/tvStatLegacy"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:textColor="@color/ef_ink_2"
+                        android:textSize="12.5sp"
+                        android:visibility="gone" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/tvStats"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/stats_empty"
+                    android:textColor="@color/ef_ink_2"
+                    android:textSize="13sp" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/ef_hairline"
+                    android:layout_marginTop="16dp"
+                    android:layout_marginBottom="16dp"
+                    android:background="@color/ef_rule" />
+
+                <!-- Sub-section D: Diagnostic Switches -->
+                <androidx.appcompat.widget.SwitchCompat
+                    android:id="@+id/swObserve"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="48dp"
+                    android:text="@string/observe_switch"
+                    android:textColor="@color/ef_ink"
+                    android:textSize="14.5sp"
+                    android:textStyle="bold"
+                    android:thumb="@drawable/ef_switch_thumb"
+                    app:showText="false"
+                    app:switchMinWidth="52dp"
+                    app:switchPadding="12dp"
+                    app:thumbTint="@null"
+                    app:track="@drawable/ef_switch_track"
+                    app:trackTint="@null" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="10dp"
+                    android:text="开启后只会记录“发现跳过按钮”，不会真的去点它，适合排查是否会误判。"
+                    android:textColor="@color/ef_ink_2"
+                    android:textSize="13sp" />
+
+                <androidx.appcompat.widget.SwitchCompat
+                    android:id="@+id/swDiag"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="48dp"
+                    android:text="@string/diag_switch"
+                    android:textColor="@color/ef_ink"
+                    android:textSize="14.5sp"
+                    android:textStyle="bold"
+                    android:thumb="@drawable/ef_switch_thumb"
+                    app:showText="false"
+                    app:switchMinWidth="52dp"
+                    app:switchPadding="12dp"
+                    app:thumbTint="@null"
+                    app:track="@drawable/ef_switch_track"
+                    app:trackTint="@null" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="在本地保存脱敏的界面结构文件，方便技术人员排查识别不准的原因。"
+                    android:textColor="@color/ef_ink_2"
+                    android:textSize="13sp" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/ef_hairline"
+                    android:layout_marginTop="16dp"
+                    android:layout_marginBottom="16dp"
+                    android:background="@color/ef_rule" />
+
+                <!-- Sub-section E: Runtime Logs -->
+                <LinearLayout
+                    android:id="@+id/sectionLogs"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="运行记录"
+                            android:textColor="@color/ef_ink"
+                            android:textSize="15sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tvLogMeta"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="0 行"
+                            android:textColor="@color/ef_ink_2"
+                            android:textSize="12.5sp" />
+                    </LinearLayout>
+
+                    <com.flashskip.ui.EfWrapLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:layout_marginBottom="10dp"
+                        app:efHorizontalGap="8dp"
+                        app:efVerticalGap="8dp">
+
+                        <com.flashskip.ui.EfButton
+                            android:id="@+id/btnRefresh"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/btn_refresh"
+                            android:textSize="13sp"
+                            app:efKind="normal"
+                            app:efSmall="true" />
+
+                        <com.flashskip.ui.EfButton
+                            android:id="@+id/btnCopyLog"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/btn_copy_log"
+                            android:textSize="13sp"
+                            app:efKind="normal"
+                            app:efSmall="true" />
+
+                        <com.flashskip.ui.EfButton
+                            android:id="@+id/btnShareLog"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/btn_share_log"
+                            android:textSize="13sp"
+                            app:efKind="normal"
+                            app:efSmall="true" />
+
+                        <com.flashskip.ui.EfButton
+                            android:id="@+id/btnClearLog"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/btn_clear_log"
+                            android:textSize="13sp"
+                            app:efKind="danger"
+                            app:efSmall="true" />
+                    </com.flashskip.ui.EfWrapLayout>
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="8dp"
+                        android:text="@string/log_header"
+                        android:textColor="@color/ef_ink_2"
+                        android:textSize="12.5sp" />
+
+                    <FrameLayout
+                        android:id="@+id/logContainerBox"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/fs_tile_bg">
+
+                        <FrameLayout
+                            android:id="@+id/emptyLogBox"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:visibility="visible">
+
+                            <com.flashskip.ui.EfHatchView
+                                android:id="@+id/hatchEmptyLog"
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:visibility="gone"
+                                app:efHatchBordered="true" />
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:orientation="vertical"
+                                android:padding="16dp">
+
+                                <TextView
+                                    android:id="@+id/tvEmptyLogText"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:gravity="center"
+                                    android:lineSpacingMultiplier="1.4"
+                                    android:text="@string/log_empty"
+                                    android:textColor="@color/ef_ink_2"
+                                    android:textSize="13.5sp" />
+                            </LinearLayout>
+                        </FrameLayout>
+
+                        <TextView
+                            android:id="@+id/tvLog"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="monospace"
+                            android:lineSpacingMultiplier="1.35"
+                            android:padding="12dp"
+                            android:textColor="@color/ef_ink"
+                            android:textIsSelectable="true"
+                            android:textSize="11.5sp"
+                            android:visibility="gone" />
+                    </FrameLayout>
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>

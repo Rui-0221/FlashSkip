@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <!-- Top App Header / Endfield Dark Command Bar -->
+    <com.flashskip.ui.EfCommandBarLayout
+        android:id="@+id/commandBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/ef_command_bar"
+        android:minHeight="56dp"
+        android:paddingStart="16dp"
+        android:paddingTop="10dp"
+        android:paddingEnd="14dp"
+        android:paddingBottom="10dp">
+
+        <LinearLayout
+            android:id="@+id/brandGroup"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:id="@+id/ivBrandSeal"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:contentDescription="@null"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_ef_flash_seal" />
+
+            <View
+                android:id="@+id/vEndfieldMark"
+                android:layout_width="10dp"
+                android:layout_height="10dp"
+                android:background="#FFFA00"
+                android:importantForAccessibility="no"
+                android:visibility="gone" />
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tvCommandBrand"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/app_display_name"
+                    android:textColor="@color/ef_command_bar_ink"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvCommandVer"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="不联网 · 本地运行"
+                    android:textColor="@color/ef_command_bar_muted"
+                    android:textSize="11.5sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tvCmdStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/ef_state_alert_bg"
+            android:gravity="center"
+            android:paddingStart="10dp"
+            android:paddingTop="5dp"
+            android:paddingEnd="10dp"
+            android:paddingBottom="5dp"
+            android:text="待开启"
+            android:textColor="@color/fs_status_alert_fg"
+            android:textSize="12.5sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/btnThemeQuick"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:minWidth="48dp"
+            android:minHeight="48dp"
+            android:paddingStart="12dp"
+            android:paddingTop="8dp"
+            android:paddingEnd="12dp"
+            android:paddingBottom="8dp"
+            android:text="主题·自动"
+            android:textColor="@color/ef_command_bar_ink"
+            android:textSize="12.5sp"
+            android:textStyle="bold" />
+    </com.flashskip.ui.EfCommandBarLayout>
+
+    <!-- Classic Style Divider -->
+    <View
+        android:id="@+id/headerHairline"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/ef_hairline"
+        android:background="@color/ef_rule"
+        android:importantForAccessibility="no" />
+
+    <!-- Endfield 3dp Tri-Color Strip under Command Bar (magenta / signal yellow / mint) -->
+    <LinearLayout
+        android:id="@+id/triStripContainer"
+        android:layout_width="match_parent"
+        android:layout_height="3dp"
+        android:importantForAccessibility="no"
+        android:orientation="horizontal"
+        android:visibility="gone">
+
+        <View
+            android:id="@+id/triStripA"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="#FF00F0" />
+
+        <View
+            android:id="@+id/triStripB"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="#FFFA00" />
+
+        <View
+            android:id="@+id/triStripC"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="#00FFA2" />
+    </LinearLayout>
+</LinearLayout>

@@ -1,0 +1,283 @@
+package com.flashskip
+
+import androidx.appcompat.app.AppCompatDelegate
+import com.flashskip.data.StatsSummary
+import com.flashskip.keepalive.KeepAliveStatus
+import com.flashskip.keepalive.SettingsDestination
+import com.flashskip.ui.ConsoleFormatter
+import com.flashskip.ui.FlashTheme
+import com.flashskip.ui.SkipToastGate
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class ConsoleFormatterTest {
+
+    @Test
+    fun `empty stats renders empty state and preserves legacy migration notice`() {
+        val pureEmpty = StatsSummary(
+            totalSkipped = 0,
+            todaySkipped = 0,
+            p50Ms = -1L,
+            p95Ms = -1L,
+            sampleCount = 0,
+            legacyTotalSkipped = 0,
+            stillPresentAttempts = 0,
+            navigatedAttempts = 0,
+            unobservedAttempts = 0
+        )
+        val p0 = ConsoleFormatter.formatStats(pureEmpty)
+        assertTrue(p0.isEmpty)
+        assertNull(p0.legacyNotice)
+
+        val migrated = pureEmpty.copy(legacyTotalSkipped = 12)
+        val p1 = ConsoleFormatter.formatStats(migrated)
+        assertTrue(p1.isEmpty)
+        assertTrue(p1.legacyNotice?.contains("12") == true)
+        assertTrue(p1.summaryLine.contains("12"))
+    }
+
+    @Test
+    fun `zero ms latency is valid while negative latency shows sample shortage`() {
+        val s = StatsSummary(
+            totalSkipped = 6,
+            todaySkipped = 2,
+            p50Ms = 0L,
+            p95Ms = -1L,
+            sampleCount = 6,
+            legacyTotalSkipped = 0,
+            stillPresentAttempts = 1,
+            navigatedAttempts = 2,
+            unobservedAttempts = 3
+        )
+        val p = ConsoleFormatter.formatStats(s)
+        assertFalse(p.isEmpty)
+        assertEquals("2", p.todayText)
+        assertEquals("6", p.totalText)
+        assertEquals("0 ms", p.p50Text)
+        assertEquals("样本不足 (6/20)", p.p95Text)
+        assertEquals("6 条记录", p.sampleCountText)
+        assertEquals("1 次", p.stillPresentText)
+        assertEquals("2 次", p.navigatedText)
+        assertEquals("3 次", p.unobservedText)
+        assertTrue(p.summaryLine.contains("中位速度 0ms"))
+        assertTrue(p.summaryLine.contains("95%耗时 样本不足"))
+    }
+
+    @Test
+    fun `attempt-only activity exits empty state without computing miss rates`() {
+        val s = StatsSummary(
+            totalSkipped = 0,
+            todaySkipped = 0,
+            p50Ms = -1L,
+            p95Ms = -1L,
+            sampleCount = 0,
+            legacyTotalSkipped = 0,
+            stillPresentAttempts = 0,
+            navigatedAttempts = 2,
+            unobservedAttempts = 1
+        )
+        val p = ConsoleFormatter.formatStats(s)
+        assertFalse(p.isEmpty)
+        assertEquals("2 次", p.navigatedText)
+        assertEquals("1 次", p.unobservedText)
+    }
+
+    @Test
+    fun `readiness, window segments, and command status map accurately`() {
+        assertEquals(0, ConsoleFormatter.computeReadiness(false, false, false).filledSegments24)
+        assertEquals(16, ConsoleFormatter.computeReadiness(true, true, false).filledSegments24)
+        assertEquals(24, ConsoleFormatter.computeReadiness(true, true, true).filledSegments24)
+
+        assertEquals(3, ConsoleFormatter.windowSeconds(1000L))
+        assertEquals(15, ConsoleFormatter.windowSeconds(30000L))
+        assertEquals(24, ConsoleFormatter.windowSegments24(15))
+
+        assertEquals("OFF │ 06S", ConsoleFormatter.commandStatusText(false, false, true, false, 6))
+        assertEquals("WAIT │ 06S", ConsoleFormatter.commandStatusText(false, true, true, false, 6))
+        assertEquals("PAUSE │ 06S", ConsoleFormatter.commandStatusText(true, true, false, false, 6))
+        assertEquals("OBS │ 06S", ConsoleFormatter.commandStatusText(true, true, true, true, 6))
+        assertEquals("RUN │ 10S", ConsoleFormatter.commandStatusText(true, true, true, false, 10))
+    }
+
+    @Test
+    fun `test lab catalog covers all 20 unique scenarios and theme cycles predictably`() {
+        assertEquals(20, ConsoleFormatter.TEST_LAB_SCENARIOS.size)
+        val keys = ConsoleFormatter.TEST_LAB_SCENARIOS.map { it.key }.toSet()
+        assertEquals(20, keys.size)
+        assertEquals("No.01", ConsoleFormatter.TEST_LAB_SCENARIOS.first().indexLabel)
+        assertEquals("No.20", ConsoleFormatter.TEST_LAB_SCENARIOS.last().indexLabel)
+
+        assertEquals(
+            ConsoleFormatter.ThemeOption.LIGHT,
+            ConsoleFormatter.ThemeOption.nextCycle(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
+        )
+        assertEquals(
+            ConsoleFormatter.ThemeOption.DARK,
+            ConsoleFormatter.ThemeOption.nextCycle(AppCompatDelegate.MODE_NIGHT_NO)
+        )
+        assertEquals(
+            ConsoleFormatter.ThemeOption.SYSTEM,
+            ConsoleFormatter.ThemeOption.nextCycle(AppCompatDelegate.MODE_NIGHT_YES)
+        )
+    }
+
+    @Test
+    fun `command header keeps single row when wide and wraps cleanly when compact enlarged`() {
+        val compactNormal = ConsoleFormatter.computeHeaderPlacement(
+            availW = 338,
+            brandW = 140, brandH = 24,
+            statusW = 68, statusH = 20,
+            themeW = 86, themeH = 48,
+            brandGap = 12, statusGap = 8, rowGap = 6
+        )
+        assertEquals(1, compactNormal.rows)
+        assertTrue(compactNormal.brandX + 140 + 12 <= compactNormal.statusX)
+        assertEquals(338 - 86, compactNormal.themeX)
+
+        val wideEnlarged = ConsoleFormatter.computeHeaderPlacement(
+            availW = 572,
+            brandW = 205, brandH = 34,
+            statusW = 102, statusH = 28,
+            themeW = 118, themeH = 54,
+            brandGap = 12, statusGap = 8, rowGap = 6
+        )
+        assertEquals(1, wideEnlarged.rows)
+        assertTrue(wideEnlarged.brandX + 205 + 12 <= wideEnlarged.statusX)
+
+        val compactEnlarged = ConsoleFormatter.computeHeaderPlacement(
+            availW = 338,
+            brandW = 205, brandH = 34,
+            statusW = 102, statusH = 28,
+            themeW = 118, themeH = 54,
+            brandGap = 12, statusGap = 8, rowGap = 6
+        )
+        assertEquals(2, compactEnlarged.rows)
+        assertEquals(0, compactEnlarged.brandY)
+        assertEquals(0, compactEnlarged.statusX)
+        assertEquals(338 - 118, compactEnlarged.themeX)
+        assertTrue(compactEnlarged.statusY >= 34 + 6)
+        assertTrue(compactEnlarged.themeY >= 34 + 6)
+        assertTrue(compactEnlarged.statusX + 102 + 8 <= compactEnlarged.themeX)
+        assertEquals(34 + 6 + 54, compactEnlarged.contentHeight)
+
+        val ultraNarrow = ConsoleFormatter.computeHeaderPlacement(
+            availW = 160,
+            brandW = 150, brandH = 34,
+            statusW = 110, statusH = 28,
+            themeW = 110, themeH = 54,
+            brandGap = 12, statusGap = 8, rowGap = 6
+        )
+        assertEquals(3, ultraNarrow.rows)
+        assertEquals(34 + 6 + 28 + 6 + 54, ultraNarrow.contentHeight)
+    }
+
+    @Test
+    fun `consumer hero and header distinguish authorization, connection, restrictions, pause, and observe mode`() {
+        val healthy = KeepAliveStatus(
+            masterEnabled = true,
+            accessibilityEnabled = true,
+            accessibilityConnected = true,
+            foregroundActive = true,
+            batteryExempt = true,
+            backgroundRestricted = false,
+            notificationsVisible = true
+        )
+
+        val needsA11y = ConsoleFormatter.formatHomeHero(healthy.copy(accessibilityEnabled = false), false)
+        assertEquals(ConsoleFormatter.HomePrimaryAction.OPEN_ACCESSIBILITY, needsA11y.primaryAction)
+        assertEquals(ConsoleFormatter.StatusTone.ALERT, needsA11y.badgeTone)
+        assertTrue(needsA11y.showRestrictedHelp)
+        assertEquals("待开启", ConsoleFormatter.headerStatus(healthy.copy(accessibilityEnabled = false), false).label)
+
+        val connecting = ConsoleFormatter.formatHomeHero(healthy.copy(accessibilityConnected = false), false)
+        assertEquals(ConsoleFormatter.HomePrimaryAction.OPEN_ACCESSIBILITY, connecting.primaryAction)
+        assertEquals(ConsoleFormatter.StatusTone.WARN, connecting.badgeTone)
+        assertEquals("待重连", ConsoleFormatter.headerStatus(healthy.copy(accessibilityConnected = false), false).label)
+
+        val paused = ConsoleFormatter.formatHomeHero(healthy.copy(masterEnabled = false), false)
+        assertEquals(ConsoleFormatter.HomePrimaryAction.RESUME_MASTER, paused.primaryAction)
+        assertEquals(ConsoleFormatter.StatusTone.PAUSED, paused.badgeTone)
+        assertEquals("已暂停", ConsoleFormatter.headerStatus(healthy.copy(masterEnabled = false), false).label)
+
+        val restricted = ConsoleFormatter.formatHomeHero(healthy.copy(batteryExempt = false), false)
+        assertEquals(ConsoleFormatter.HomePrimaryAction.OPEN_KEEPALIVE, restricted.primaryAction)
+        assertEquals(ConsoleFormatter.StatusTone.WARN, restricted.badgeTone)
+        assertFalse(restricted.keepAliveHealthy)
+
+        val observe = ConsoleFormatter.formatHomeHero(healthy, observeOnly = true)
+        assertEquals(ConsoleFormatter.HomePrimaryAction.DISABLE_OBSERVE, observe.primaryAction)
+        assertEquals("演练中", ConsoleFormatter.headerStatus(healthy, observeOnly = true).label)
+
+        val ready = ConsoleFormatter.formatHomeHero(healthy, false)
+        assertEquals(ConsoleFormatter.HomePrimaryAction.RUN_QUICK_TEST, ready.primaryAction)
+        assertEquals(ConsoleFormatter.StatusTone.OK, ready.badgeTone)
+        assertTrue(ready.keepAliveHealthy)
+        assertEquals("保护中", ConsoleFormatter.headerStatus(healthy, false).label)
+    }
+
+    @Test
+    fun `keep-alive readiness, brand guide fallback text, and toast cooldown gate behave predictably`() {
+        val status = KeepAliveStatus(
+            masterEnabled = true,
+            accessibilityEnabled = true,
+            accessibilityConnected = true,
+            foregroundActive = true,
+            batteryExempt = false,
+            backgroundRestricted = false,
+            notificationsVisible = true
+        )
+        val r4 = ConsoleFormatter.computeKeepAliveReadiness4(status)
+        assertEquals(3, r4.readyCount)
+        assertEquals(18, r4.filledSegments24)
+
+        assertEquals("荣耀手机（MagicOS）", ConsoleFormatter.brandDisplayName("HONOR", "HONOR"))
+        assertTrue(ConsoleFormatter.oemJumpFeedbackText(null).contains("手动"))
+        assertTrue(ConsoleFormatter.oemJumpFeedbackText(SettingsDestination.APP_DETAILS).contains("应用详情"))
+        assertTrue(ConsoleFormatter.buildBrandStepsWithRecentLock(listOf("步骤一")).any { "最近任务" in it })
+        assertEquals(6, ConsoleFormatter.allBrandGuides().size)
+
+        val gate = SkipToastGate(cooldownMs = 1800L)
+        assertTrue(gate.shouldShow(10_000L))
+        assertFalse(gate.shouldShow(10_500L))
+        assertFalse(gate.shouldShow(11_799L))
+        assertTrue(gate.shouldShow(11_800L))
+    }
+
+    @Test
+    fun `endfield theme palette enforces tokens, light contrast safety, and dual theme separation`() {
+        assertEquals(FlashTheme.ThemeStyle.CLASSIC, FlashTheme.ThemeStyle.fromKey(null))
+        assertEquals(FlashTheme.ThemeStyle.CLASSIC, FlashTheme.ThemeStyle.fromKey("unknown"))
+        assertEquals(FlashTheme.ThemeStyle.ENDFIELD, FlashTheme.ThemeStyle.fromKey("endfield"))
+        assertEquals(ConsoleFormatter.ThemeStyleOption.ENDFIELD, ConsoleFormatter.ThemeStyleOption.fromKey("ENDFIELD"))
+
+        val efLight = FlashTheme.paletteFor(FlashTheme.ThemeStyle.ENDFIELD, dark = false)
+        val efDark = FlashTheme.paletteFor(FlashTheme.ThemeStyle.ENDFIELD, dark = true)
+        val clLight = FlashTheme.paletteFor(FlashTheme.ThemeStyle.CLASSIC, dark = false)
+
+        // Endfield fixed token invariants
+        assertEquals(0xFFF4F4F2.toInt(), efLight.paper)
+        assertEquals(0xFF191919.toInt(), efDark.paper)
+        assertEquals(0xFFFFFA00.toInt(), efLight.signal)
+        assertEquals(0xFFFFFA00.toInt(), efDark.signal)
+        assertEquals(0xFF161616.toInt(), efLight.commandBar)
+        assertEquals(0xFF161616.toInt(), efDark.commandBar)
+
+        // Light Endfield never uses acid yellow for ink lines or text links
+        assertEquals(efLight.ink, efLight.trace)
+        assertEquals(efLight.ink, efLight.linkColor)
+        assertNotEquals(efLight.signal, efLight.linkColor)
+
+        // Dark Endfield promotes trace & link to high-contrast acid yellow against dark paper
+        assertEquals(efDark.signal, efDark.trace)
+        assertEquals(efDark.signal, efDark.linkColor)
+
+        // Alert badge in Endfield uses signal yellow + ink (never danger red)
+        assertEquals(efLight.signal, efLight.statusAlertBg)
+        assertEquals(efLight.onSignal, efLight.statusAlertFg)
+        assertNotEquals(clLight.signal, efLight.signal)
+    }
+}

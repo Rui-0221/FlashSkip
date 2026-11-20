@@ -3,6 +3,7 @@ package com.flashskip.a11y
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
 import android.graphics.Path
+import android.graphics.Rect
 import android.os.Handler
 import android.view.accessibility.AccessibilityNodeInfo
 import com.flashskip.core.ActionCommand
@@ -27,13 +28,14 @@ object ActionExecutor {
         screenWidth: Int,
         screenHeight: Int,
         callbackHandler: Handler,
+        canDispatch: () -> Boolean,
         onGestureOutcome: (sessionId: Long, attemptId: Long, completed: Boolean) -> Unit
     ): ExecutionResult {
         val decision = command.decision
 
         if (command.preferredMethod == ClickMethod.NODE_ACTION) {
             val clickNode = tree.nodeAt(decision.clickNodeIndex)
-            val nodeOk = clickNode != null &&
+            val nodeOk = clickNode != null && canDispatch() &&
                 try {
                     clickNode.performAction(AccessibilityNodeInfo.ACTION_CLICK)
                 } catch (_: Exception) {
@@ -47,6 +49,23 @@ object ActionExecutor {
             }
         }
 
+        val target = tree.nodeAt(decision.targetNodeIndex)
+        val targetStillAtMatch = if (target == null) false else try {
+            if (!target.refresh() || !target.isVisibleToUser || !target.isEnabled) {
+                false
+            } else {
+                val bounds = Rect().also(target::getBoundsInScreen)
+                val retry = command.retryTarget
+                bounds.contains(decision.targetBounds.centerX.toInt(), decision.targetBounds.centerY.toInt()) &&
+                    (retry == null || (retry.matchesWindow(target.packageName?.toString().orEmpty(), target.windowId) &&
+                        retry.matches(tree.currentTarget(decision.targetNodeIndex, target, bounds))))
+            }
+        } catch (_: Exception) {
+            false
+        }
+        if (!targetStillAtMatch || !canDispatch()) {
+            return ExecutionResult(dispatched = false, actualMethod = ClickMethod.GESTURE)
+        }
         val gestureOk = dispatchClampedTap(
             service = service,
             bounds = decision.targetBounds,
@@ -76,7 +95,7 @@ object ActionExecutor {
 
         return try {
             val path = Path().apply { moveTo(x, y) }
-            val stroke = GestureDescription.StrokeDescription(path, 0L, 60L)
+            val stroke = GestureDescription.StrokeDescription(path, 0L, 35L)
             val gesture = GestureDescription.Builder().addStroke(stroke).build()
             val cb = object : AccessibilityService.GestureResultCallback() {
                 override fun onCompleted(gestureDescription: GestureDescription?) {

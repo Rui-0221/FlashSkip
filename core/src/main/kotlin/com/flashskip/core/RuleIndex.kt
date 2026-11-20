@@ -48,8 +48,8 @@ class RuleIndex(rules: List<AppRule> = emptyList()) {
                 AppRule(id = "sdk-zj-skip", packageName = "*", viewIdContains = "zj_skip", preferGesture = true),
                 AppRule(id = "sdk-fl-skip", packageName = "*", viewIdContains = "fl_skip", preferGesture = true),
                 AppRule(id = "sdk-ad-skip", packageName = "*", viewIdContains = "ad_skip", preferGesture = true),
-                AppRule(id = "sdk-splash-skip", packageName = "*", viewIdContains = "splash_skip", preferGesture = true),
-                AppRule(id = "sdk-layout-skip", packageName = "*", viewIdContains = "layout_skip", preferGesture = true)
+                AppRule(id = "sdk-splash-skip", packageName = "*", viewIdContains = "splash_skip"),
+                AppRule(id = "sdk-layout-skip", packageName = "*", viewIdContains = "layout_skip")
             )
         )
     }

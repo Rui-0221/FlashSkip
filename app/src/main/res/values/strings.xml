@@ -1,37 +1,48 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">FlashSkip</string>
-    <string name="service_desc">识别并自动点击开屏广告的“跳过”按钮。仅在应用启动后的短窗口期内工作，默认排除银行/支付与系统应用，所有数据仅保存在本机。</string>
+    <string name="app_display_name">FlashSkip 闪跳</string>
+    <string name="service_desc">帮您自动跳过打开应用时的开屏广告。仅在应用打开后的几秒内识别“跳过”按钮，默认自动避开银行、支付和系统软件，不联网、不读取个人隐私。</string>
     <string name="title">FlashSkip 闪跳</string>
-    <string name="subtitle">v0.7.0-m1 · 事件驱动开屏跳过（零网络权限）</string>
+    <string name="subtitle">纯本地运行 · 不联网 · 自动跳过开屏广告</string>
 
-    <string name="status_running">✅ 无障碍服务运行中</string>
-    <string name="status_connecting">⚠️ 已授权，服务连接中…（若长期未连接，请关闭再重开无障碍开关或检查受限设置）</string>
-    <string name="status_disabled">❌ 无障碍服务未开启 —— 点下方按钮去开启</string>
+    <string name="status_running">正在保护中，打开其他软件遇到开屏广告时会自动帮您跳过</string>
+    <string name="status_connecting">权限已开启，但后台服务暂时断开，建议前往无障碍重新开启一次</string>
+    <string name="status_disabled">尚未开启“无障碍服务”，开启后就能自动帮您跳过开屏广告</string>
 
-    <string name="master_switch">自动跳过总开关</string>
-    <string name="observe_switch">观察模式（只记录，不点击）</string>
-    <string name="window_label">启动窗口期（建议 6 秒，超时自动休眠）</string>
+    <string name="badge_running">保护中</string>
+    <string name="badge_connecting">待重连</string>
+    <string name="badge_disabled">未开启</string>
+    <string name="badge_paused">已暂停</string>
+
+    <string name="master_switch">自动跳过开屏广告</string>
+    <string name="skip_toast_switch">跳过广告后显示一行轻提示</string>
+    <string name="observe_switch">仅检测不点击（演练模式）</string>
+    <string name="window_label">等待识别时长</string>
     <string name="window_value_fmt">%1$s：%2$d 秒</string>
-    <string name="diag_switch">快照诊断（保存脱敏节点 JSON 至本地 files/snapshots）</string>
+    <string name="diag_switch">保存界面分析快照（用于排查识别问题）</string>
 
     <string name="btn_enable">去开启无障碍服务</string>
-    <string name="btn_restricted_settings">应用详情（受限设置/权限）</string>
-    <string name="btn_battery_opt">电池优化/后台保活设置</string>
-    <string name="btn_test">快速靶场测试（标准 800ms）</string>
-    <string name="btn_test_lab">8 项对抗靶场（正/负向防误触验证）</string>
-    <string name="btn_exclusions">安全排除名单管理</string>
+    <string name="btn_restricted_settings">解除系统受限限制（应用详情）</string>
+    <string name="btn_battery_opt">一键设为电量无限制</string>
+    <string name="btn_test">体验一次模拟跳过</string>
+    <string name="btn_test_lab">查看全部 20 项测试场景</string>
+    <string name="btn_exclusions">管理免打扰应用名单</string>
 
-    <string name="btn_refresh">刷新</string>
-    <string name="btn_copy_log">复制日志</string>
-    <string name="btn_share_log">导出</string>
-    <string name="btn_clear_log">清空</string>
+    <string name="btn_refresh">刷新记录</string>
+    <string name="btn_copy_log">复制全部</string>
+    <string name="btn_share_log">分享导出</string>
+    <string name="btn_clear_log">清空记录</string>
 
-    <string name="stats_empty">暂无跳过记录（所有统计与日志仅保存在本机）</string>
-    <string name="log_header">运行日志（选中文本时自动暂停刷新）</string>
-    <string name="log_empty">（暂无日志）</string>
-    <string name="fake_ad_text">模拟开屏广告\n（测试靶场，非真实广告）</string>
-    <string name="btn_close_test">关闭对照页</string>
+    <string name="skip_success_toast">FlashSkip 已跳过广告</string>
 
-    <string name="guide">安全与使用说明：\n1. 首次侧载安装（Android 13+）若无障碍开关灰色：先点「应用详情」→ 右上角三点菜单 →「允许受限设置」，再开启无障碍服务。\n2. 保活：请将电池优化设为无限制，并在最近任务中给 FlashSkip 加锁。\n3. 硬性安全闸：默认启动窗口期 6 秒（3–15 秒可调）、冷却 0.6 秒、单次最多 4 次；强语义黑名单拦截“跳过引导/领红包/片头”；祖先尺寸锁防止误点全屏广告容器；内置排除微信、支付宝、主流银行与系统应用。</string>
+    <string name="stats_empty">还没有跳过记录。开启权限和开关后，正常打开带开屏广告的软件就能看到这里增长。</string>
+    <string name="exclusions_empty">暂未添加自定义忽略的应用。如果您希望某些软件保留开屏画面，可以点击下方按钮添加。</string>
+    <string name="log_header">近期运行记录（选中文字时自动暂停滚动）</string>
+    <string name="log_empty">暂无运行记录。开启服务、调整设置或运行测试后会记录在这里。</string>
+
+    <string name="fake_ad_text">模拟开屏广告\n（用于体验自动跳过效果，非真实广告）</string>
+    <string name="btn_close_test">关闭模拟页</string>
+
+    <string name="guide">1. 为什么完全保护隐私？本应用没有申请联网权限，所有识别与记录只在手机本地完成，绝不上传任何内容。\n2. 为什么不会误点广告或支付按钮？闪跳只在打开软件的头几秒内工作，并内置防误触保护，自动避开“跳过引导”“领红包”“跳过付款”及全屏广告区域，同时默认排除系统界面、输入法与 19 款金融支付应用。\n3. 如何保证全天稳定不失效？请进入「后台保活」页完成权限、常驻通知、电量无限制与本机品牌自启动设置，并在最近任务中锁定闪跳卡片。</string>
 </resources>

@@ -1,5 +1,9 @@
 package com.flashskip.keepalive
 
+import android.app.Activity
+import android.app.ActivityManager
+import android.app.NotificationManager
+import android.content.ActivityNotFoundException
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -8,11 +12,27 @@ import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
 import com.flashskip.SkipAdService
+import com.flashskip.data.StatsStore
 
 /**
  * Exact permission, battery-optimization, and OEM keep-alive helpers.
  */
 object PermissionHelper {
+
+    fun readStatus(context: Context) = KeepAliveStatus(
+        masterEnabled = StatsStore(context).masterEnabled,
+        accessibilityEnabled = isAccessibilityEnabledInSettings(context),
+        accessibilityConnected = SkipAdService.connected,
+        foregroundActive = SkipAdService.foregroundActive,
+        batteryExempt = isIgnoringBatteryOptimizations(context),
+        backgroundRestricted = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P &&
+            context.getSystemService(ActivityManager::class.java)?.isBackgroundRestricted == true,
+        notificationsVisible = context.getSystemService(NotificationManager::class.java)?.let { manager ->
+            manager.areNotificationsEnabled() &&
+                manager.getNotificationChannel(SkipAdService.NOTIFICATION_CHANNEL_ID)?.importance !=
+                NotificationManager.IMPORTANCE_NONE
+        } == true
+    )
 
     /**
      * Accurately checks whether [SkipAdService] is enabled in system settings by parsing
@@ -44,68 +64,65 @@ object PermissionHelper {
         }
     }
 
-    fun openAccessibilitySettings(context: Context): Boolean {
-        return try {
-            context.startActivity(
-                Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            )
-            true
-        } catch (_: Exception) {
-            false
-        }
-    }
+    fun openAccessibilitySettings(context: Context): Boolean =
+        open(context, Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
 
     /**
      * Opens App Info so Android 13+ users can enable "Allow restricted settings" from the top-right menu.
      */
-    fun openAppDetailsSettings(context: Context): Boolean {
-        return try {
-            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                data = Uri.fromParts("package", context.packageName, null)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            context.startActivity(intent)
-            true
-        } catch (_: Exception) {
-            false
-        }
-    }
+    fun openAppDetailsSettings(context: Context): Boolean =
+        open(context, Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, packageUri(context)))
 
     fun openBatteryOptimizationSettings(context: Context): Boolean {
-        try {
-            val direct = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                data = Uri.parse("package:${context.packageName}")
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            context.startActivity(direct)
+        if (!isIgnoringBatteryOptimizations(context) && open(
+                context, Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, packageUri(context))
+            )) {
             return true
-        } catch (_: Exception) {
         }
-        return try {
-            val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            context.startActivity(intent)
-            true
-        } catch (_: Exception) {
-            openAppDetailsSettings(context)
-        }
+        return open(context, Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) ||
+            openAppDetailsSettings(context) || open(context, Intent(Settings.ACTION_SETTINGS))
     }
 
-    fun oemKeepAliveAdvice(): String {
-        val brand = Build.MANUFACTURER.lowercase()
-        return when {
-            brand.contains("honor") ->
-                "荣耀 MagicOS：应用启动管理 → 关闭自动管理 → 开启自启动/关联启动/后台活动，并在最近任务卡片下拉加锁。"
-            brand.contains("huawei") ->
-                "华为 EMUI/HarmonyOS：应用启动管理 → 关闭自动管理 → 全开三项，最近任务卡片下拉加锁。"
-            brand.contains("xiaomi") || brand.contains("redmi") ->
-                "小米 HyperOS/MIUI：开启自启动、省电策略设为无限制、关闭“闲置时删除权限”，最近任务加锁；Android 13+ 先在应用详情右上角允许受限设置。"
-            brand.contains("oppo") || brand.contains("oneplus") || brand.contains("realme") ->
-                "OPPO/一加 ColorOS：允许自启动与后台运行，最近任务锁定；若无障碍灰色不可点，先在应用详情右上角允许受限设置。"
-            brand.contains("vivo") || brand.contains("iqoo") ->
-                "vivo OriginOS：开启自启动并设后台高耗电允许，最近任务锁定。"
-            else ->
-                "建议在电池优化中将 FlashSkip 设为无限制，Android 13+ 若无障碍被限制请前往“应用详情 → 右上角菜单 → 允许受限设置”。"
+    fun openOemBackgroundSettings(context: Context): SettingsDestination? {
+        val pages = currentOem().pages
+        for (page in pages) {
+            val intent = Intent(page.action).apply {
+                setPackage(page.packageName)
+                page.activity?.let { activity ->
+                    component = ComponentName.createRelative(page.packageName, activity)
+                }
+                page.activityType?.let { putExtra("activity_type", it) }
+            }
+            if (open(context, intent)) return SettingsDestination.OEM_BACKGROUND
+        }
+        if (openAppDetailsSettings(context)) return SettingsDestination.APP_DETAILS
+        if (open(context, Intent(Settings.ACTION_SETTINGS))) return SettingsDestination.SYSTEM_SETTINGS
+        return null
+    }
+
+    fun openNotificationSettings(context: Context): Boolean =
+        open(context, Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+            putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+        }) || openAppDetailsSettings(context)
+
+    fun backgroundGuide(): KeepAliveGuide = currentOem().guide
+
+    fun oemKeepAliveAdvice(): String = backgroundGuide().steps.joinToString("\n")
+
+    private fun currentOem() = OemBackgroundSettings.forDevice(Build.MANUFACTURER, Build.BRAND)
+
+    private fun packageUri(context: Context): Uri = Uri.fromParts("package", context.packageName, null)
+
+    private fun open(context: Context, intent: Intent): Boolean {
+        if (context !is Activity) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        // Direct start also works when Android package visibility hides the target from resolveActivity.
+        return try {
+            context.startActivity(intent)
+            true
+        } catch (_: ActivityNotFoundException) {
+            false
+        } catch (_: SecurityException) {
+            false
         }
     }
 }

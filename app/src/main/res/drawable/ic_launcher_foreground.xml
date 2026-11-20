@@ -4,7 +4,16 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+    <!-- Original industrial chamfer frame + geometric flash chevron -->
     <path
-        android:fillColor="#FFD54F"
-        android:pathData="M58,24 L38,58 h14 l-4,26 L72,50 h-14 z" />
+        android:fillColor="#00000000"
+        android:pathData="M24,24 H84 V72 L72,84 H24 Z"
+        android:strokeWidth="2.5"
+        android:strokeColor="#323A3F" />
+    <path
+        android:fillColor="#FFFA00"
+        android:pathData="M60,29 L38,57 H52 L48,79 L70,51 H56 Z" />
+    <path
+        android:fillColor="#EDEDED"
+        android:pathData="M73,73 H81 V76 L76,81 H73 Z" />
 </vector>

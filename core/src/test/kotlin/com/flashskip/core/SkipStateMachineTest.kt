@@ -18,6 +18,7 @@ class SkipStateMachineTest {
             screenWidth = screenW,
             screenHeight = screenH,
             isFullScreen = true,
+            windowId = 3,
             nodes = listOf(
                 NodeSnapshot(
                     index = 0,
@@ -84,26 +85,25 @@ class SkipStateMachineTest {
         fsm.onActionDispatched(res1.command.sessionId, res1.command.attemptId, ClickMethod.NODE_ACTION, ok = true)
 
         // Delayed verify finds skip button is STILL present (fake-success!)
-        val verify1 = fsm.onVerifyCheck(
+        val verify1 = fsm.finishVerification(
             sessionId = res1.command.sessionId,
             attemptId = res1.command.attemptId,
-            clickedPkg = "com.demo.news",
-            currentForegroundPkg = "com.demo.news",
-            stillHasSkipTarget = true
+            outcome = VerifyOutcome.STILL_PRESENT,
+            retryTarget = TargetEvidence(splashWindow(), res1.command.decision)
         )
         assertEquals(VerifyOutcome.STILL_PRESENT, verify1)
         assertTrue(fsm.armed)
 
-        // Attempt 2 after cooldown MUST escalate directly to GESTURE
+        // A verified retry of the same target can run before the normal cooldown.
         val res2 = fsm.evaluateSnapshot(
-            splashWindow(), nowMs = 1900L,
+            splashWindow(), nowMs = 1285L,
             masterEnabled = true, observeOnly = false, windowMs = 6000L
         ) as EvaluationResult.ExecuteClick
         assertEquals(ClickMethod.GESTURE, res2.command.preferredMethod)
     }
 
     @Test
-    fun `stale verify from previous app does NOT disarm newly opened app`() {
+    fun `cross-package navigation clears pending attempt and stale verification leaves next session armed`() {
         val fsm = SkipStateMachine()
         fsm.onWindowStateChanged("com.app.one", "com.app.one.SplashActivity", true, nowMs = 1000L)
         val cmd = (fsm.evaluateSnapshot(
@@ -112,41 +112,103 @@ class SkipStateMachineTest {
         ) as EvaluationResult.ExecuteClick).command
 
         // User rapidly switches to com.app.two before the 400ms verify runs
-        fsm.onWindowStateChanged("com.app.two", "com.app.two.SplashActivity", true, nowMs = 1200L)
-        assertTrue(fsm.armed)
+        val navigation = fsm.onWindowStateChanged("com.app.two", "com.app.two.SplashActivity", true, nowMs = 1200L)
+        assertEquals(VerifyOutcome.NAVIGATED, navigation)
+        assertFalse(fsm.armed)
         assertEquals("com.app.two", fsm.activePackage)
+        fsm.onWindowStateChanged("com.app.three", "com.app.three.SplashActivity", true, nowMs = 1250L)
 
         // Stale verify callback for com.app.one arrives after com.app.two started a new session
-        val outcome = fsm.onVerifyCheck(
+        val outcome = fsm.finishVerification(
             sessionId = cmd.sessionId,
             attemptId = cmd.attemptId,
-            clickedPkg = "com.app.one",
-            currentForegroundPkg = "com.app.two",
-            stillHasSkipTarget = false
+            outcome = VerifyOutcome.VERIFIED_CLOSED
         )
         assertEquals(VerifyOutcome.IGNORED_STALE, outcome)
         // Crucial: com.app.two MUST remain armed!
         assertTrue(fsm.armed)
-        assertEquals("com.app.two", fsm.activePackage)
+        assertEquals("com.app.three", fsm.activePackage)
     }
 
     @Test
-    fun `same-session verify when foreground changed to home closes session cleanly`() {
+    fun `same-package landing activity is navigation without verified closure`() {
         val fsm = SkipStateMachine()
         fsm.onWindowStateChanged("com.app.one", "com.app.one.SplashActivity", true, nowMs = 1000L)
-        val cmd = (fsm.evaluateSnapshot(
+        fsm.evaluateSnapshot(
             splashWindow("com.app.one"), nowMs = 1100L,
             masterEnabled = true, observeOnly = false, windowMs = 6000L
-        ) as EvaluationResult.ExecuteClick).command
+        ) as EvaluationResult.ExecuteClick
 
-        val outcome = fsm.onVerifyCheck(
-            sessionId = cmd.sessionId,
-            attemptId = cmd.attemptId,
-            clickedPkg = "com.app.one",
-            currentForegroundPkg = "com.android.launcher",
-            stillHasSkipTarget = false
+        val outcome = fsm.onWindowStateChanged("com.app.one", "com.app.one.LandingActivity", true, nowMs = 1200L)
+        assertEquals(VerifyOutcome.NAVIGATED, outcome)
+        assertFalse(fsm.armed)
+    }
+
+    @Test
+    fun `unobserved attempt disarms and prevents an unverified retry`() {
+        val fsm = SkipStateMachine()
+        fsm.onWindowStateChanged("com.demo.news", "com.demo.news.SplashActivity", true, nowMs = 1000L)
+        val cmd = (fsm.evaluateSnapshot(splashWindow(), 1100L, true, false, 6000L)
+            as EvaluationResult.ExecuteClick).command
+        assertEquals(
+            VerifyOutcome.UNOBSERVED,
+            fsm.finishVerification(cmd.sessionId, cmd.attemptId, VerifyOutcome.UNOBSERVED)
         )
-        assertEquals(VerifyOutcome.VERIFIED_CLOSED, outcome)
+        assertFalse(fsm.armed)
+        assertEquals(EvaluationResult.NoOp, fsm.evaluateSnapshot(splashWindow(), 1600L, true, false, 6000L))
+    }
+
+    @Test
+    fun `visible ad marker and incomplete absence are different from confirmed absence`() {
+        val target = splashWindow().nodes.single().copy(index = 1, parentIndex = 0, depth = 1)
+        val root = target.copy(index = 0, parentIndex = -1, className = "android.widget.FrameLayout",
+            viewId = "", text = "", bounds = RectBounds(0, 0, screenW, screenH), depth = 0)
+        val marker = target.copy(index = 2, viewId = "", text = "广告", bounds = RectBounds(30, 30, 100, 100))
+        val initial = splashWindow().copy(nodes = listOf(root, target, marker))
+        val decision = requireNotNull(SkipMatcher.findBestMatch(initial, RuleIndex.defaultBuiltin()))
+        val evidence = TargetEvidence(initial, decision)
+        val newCountdown = target.copy(text = "跳过 2s")
+        assertEquals(TargetObservation.TARGET_PRESENT, evidence.observe(initial.copy(nodes = listOf(root, newCountdown))))
+        assertEquals(TargetObservation.AD_PRESENT, evidence.observe(initial.copy(nodes = listOf(root, marker))))
+        assertEquals(TargetObservation.UNOBSERVED, evidence.observe(initial.copy(nodes = listOf(root), complete = false)))
+        assertEquals(TargetObservation.ABSENT, evidence.observe(initial.copy(nodes = listOf(root))))
+    }
+
+    @Test
+    fun `fast retry rejects replacements and same-package window switches`() {
+        val initial = splashWindow()
+        val original = initial.nodes.single()
+        val unsafeSnapshots = listOf(
+            initial.copy(nodes = listOf(original.copy(viewId = "com.demo.news:id/replacement"))),
+            initial.copy(nodes = listOf(original.copy(bounds = original.bounds.copy(left = original.bounds.left + 5)))),
+            initial.copy(windowId = 4),
+            initial.copy(windowId = null)
+        )
+        for (snapshot in unsafeSnapshots) {
+            val fsm = SkipStateMachine()
+            fsm.onWindowStateChanged(initial.packageName, initial.activityName, true, 1000L)
+            val attempt = (fsm.evaluateSnapshot(initial, 1100L, true, false, 6000L) as EvaluationResult.ExecuteClick).command
+            val evidence = TargetEvidence(initial, attempt.decision)
+            fsm.finishVerification(attempt.sessionId, attempt.attemptId, VerifyOutcome.STILL_PRESENT, evidence)
+            assertEquals(EvaluationResult.NoOp, fsm.evaluateSnapshot(snapshot, 1200L, true, false, 6000L))
+            assertFalse(fsm.armed)
+            assertEquals(1, fsm.attempts)
+        }
+    }
+
+    @Test
+    fun `widget state from own lab window retains the armed activity and real panel disarms`() {
+        val app = "com.flashskip"
+        val lab = "$app.TestSplashActivity"
+        val fsm = SkipStateMachine()
+        fsm.onWindowStateChanged(app, lab, true, 1000L, selfTestPackage = app, selfTestActivity = lab)
+        fsm.onWindowStateChanged(
+            app, "android.widget.FrameLayout", true, 1010L, selfTestPackage = app, selfTestActivity = lab
+        )
+        assertTrue(fsm.armed)
+        assertEquals(lab, fsm.activeActivity)
+        assertEquals(1000L, fsm.launchAtMs)
+        fsm.onWindowStateChanged(app, "$app.MainActivity", true, 1100L, selfTestPackage = app, selfTestActivity = lab)
         assertFalse(fsm.armed)
     }
 
@@ -276,5 +338,35 @@ class SkipStateMachineTest {
         // Unlocking directly into an excluded banking app must stay disarmed
         fsm.onUserPresent("com.eg.android.AlipayGphone", nowMs = 400000L)
         assertFalse(fsm.armed)
+    }
+
+    @Test
+    fun `same-class replacement needs a newly verified launch window rather than an overlay`() {
+        val fsm = SkipStateMachine()
+        val window = splashWindow()
+        val pkg = window.packageName
+        val cls = window.activityName
+        fsm.onWindowStateChanged(pkg, cls, true, 1000, windowId = 3, confirmedFullscreenActivity = true)
+        val action = fsm.evaluateSnapshot(window, 1050, true, false, 6000) as EvaluationResult.ExecuteClick
+        fsm.finishVerification(action.command.sessionId, action.command.attemptId, VerifyOutcome.VERIFIED_CLOSED)
+        fsm.onWindowStateChanged(pkg, cls, true, 1200, windowId = 4)
+        assertFalse(fsm.armed)
+        fsm.onWindowStateChanged(pkg, cls, true, 1250, windowId = 3, confirmedFullscreenActivity = true)
+        assertFalse(fsm.armed)
+        fsm.onWindowStateChanged(pkg, cls, true, 1400, windowId = 5, confirmedFullscreenActivity = true)
+        assertTrue(fsm.armed)
+        assertEquals(1400L, fsm.launchAtMs)
+    }
+
+    @Test
+    fun `observed destination cannot rearm from a late state of the same foreground window`() {
+        val fsm = SkipStateMachine()
+        val destination = ForegroundWindow("com.example.ad", 5)
+        fsm.onNavigationObserved(destination)
+        fsm.onWindowStateChanged(destination.packageName, "com.example.ad.LandingActivity", true, 1000,
+            windowId = destination.id, confirmedFullscreenActivity = true)
+        assertFalse(fsm.armed)
+        fsm.onWindowStateChanged("com.example.other", "com.example.other.MainActivity", true, 1200, windowId = 6)
+        assertTrue(fsm.armed)
     }
 }
