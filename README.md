@@ -63,45 +63,45 @@
 
 ## 实机跳过演示与毫秒级耗时记录
 
-以下演示录制于荣耀真机（Android 16，已裁剪顶部状态栏），连续展示了三种典型开屏形态：**标准可点按钮**、**全屏可点击父容器陷阱（防误触落地页）**、以及 **广告 SDK 对 `ACTION_CLICK` 假成功时的自动手势升级**：
+以下演示录制于荣耀真机（Android 16，**v1.0.0 正式版**，已裁剪顶部状态栏），连续展示了新版界面随机姿态切换、轻量提示 `FlashSkip 已跳过广告` 以及三种典型开屏对抗场景：**标准可点按钮**、**全屏可点击父容器陷阱（防误触落地页）**、以及 **广告 SDK 对 `ACTION_CLICK` 假成功时的自动手势升级**：
 
 <p align="center">
-  <img src="docs/media/flashskip-demo.gif" width="320" alt="FlashSkip 实机开屏广告自动跳过演示" />
+  <img src="docs/media/flashskip-demo.gif" width="320" alt="FlashSkip v1.0.0 实机开屏广告自动跳过演示" />
 </p>
 
 > 高清视频文件：[docs/media/flashskip-demo.mp4](docs/media/flashskip-demo.mp4)
 
 ### 本次录屏实测耗时明细（广告按钮出现 → 广告关闭）
 
-| 场景 | 跳过按钮出现时刻 | 广告关闭时刻 | 出现 → 关闭耗时 | 执行方式与说明 |
-|---|---|---|---|---|
-| **1. 标准可点跳过 (`standard`)** | `00:06:15.011` | `00:06:15.030` | **`19 ms`** | `NODE_ACTION` (`attempt=1`)，节点一渲染即瞬间点击关闭 |
-| **2. 全屏可点击父容器陷阱 (`fullscreen_parent`)** | `00:06:17.804` | `00:06:17.876` | **`72 ms`** | 祖先尺寸锁拦截全屏广告容器，拒绝攀爬父节点，直接向小按钮中心发出安全 `GESTURE`（0 误触） |
-| **3. `ACTION_CLICK` 假成功升级 (`fake_success`)** | `00:06:20.897` | `00:06:21.494` | **`597 ms`** | 第 1 次 `NODE_ACTION` 被广告 SDK 假成功忽略 → `+258ms` 验证未关闭并触发 `RETRY_ESCALATE` → 冷却结束自动升级 `GESTURE` 关闭 |
+| 场景 | 跳过按钮出现时刻 | 广告关闭时刻 | 出现 → 关闭耗时 | 事件 → 确认总耗时 | 执行方式与说明 |
+|---|---|---|---|---|---|
+| **1. 标准可点跳过 (`standard`)** | `19:57:00.727` | `19:57:00.760` | **`33 ms`** | `128 ms` | `NODE_ACTION` (`attempt=1`)，节点一渲染即瞬间点击关闭 |
+| **2. 全屏可点击父容器陷阱 (`fullscreen_parent`)** | `19:57:03.780` | `19:57:03.840` | **`59 ms`** | `134 ms` | 祖先尺寸锁拦截全屏广告容器，直接向小按钮中心发出安全 `GESTURE`（0 误触） |
+| **3. `ACTION_CLICK` 假成功升级 (`fake_success`)** | `19:57:07.095` | `19:57:07.254` | **`159 ms`** | `199 ms` | 第 1 次 `NODE_ACTION` 被广告 SDK 假成功忽略 → 核验 `STILL_PRESENT` 后自动升级 `GESTURE` 关闭，并弹出 `FlashSkip 已跳过广告` 轻提示 |
 
 <details>
 <summary>点击展开本次录屏对应的原始实测日志（精确到毫秒）</summary>
 
 ```text
-[2026-11-19 00:06:15.011] TEST_LAB[standard] skip button shown
-[2026-11-19 00:06:15.030] TEST_PASS[standard] closed, buttonVisibleFor=19ms
-[2026-11-19 00:06:15.053] NODE_ACTION pkg=com.flashskip text='跳过 3s' via=text shake=false b=860,173,1148,304 scr=1200x2664 sinceLaunch=720ms attempt=1
-[2026-11-19 00:06:15.138] VERIFIED pkg=com.flashskip (window changed, latency=720ms)
+[2026-11-21 19:57:00.727] TEST_LAB[standard] skip button shown
+[2026-11-21 19:57:00.760] TEST_PASS[standard] closed shownAtMs=441204264 closedAtMs=441204297 buttonVisibleFor=33ms
+[2026-11-21 19:57:00.762] TARGET session=3 attempt=1 via=text shake=false method=NODE_ACTION dispatch=true eventAtMs=441204263 detectAtMs=441204286 actAtMs=441204287 matchUs=2094 inputAtMs=441204290 inputReturnAtMs=441204298 dispatchRejection=-
+[2026-11-21 19:57:00.857] OUTCOME result=VERIFIED_CLOSED evidence=same_window_target_and_markers_absent session=3 attempt=1 method=NODE_ACTION matchUs=2094 detectToActMs=1 actToOutcomeMs=104 eventToConfirmedMs=128 eventToInputMs=27 inputToOutcomeMs=101
 
-[2026-11-19 00:06:17.804] TEST_LAB[fullscreen_parent] fullscreen trap + small skip shown
-[2026-11-19 00:06:17.813] GESTURE pkg=com.flashskip text='跳过' via=text shake=false b=860,173,1148,304 scr=1200x2664 sinceLaunch=439ms attempt=1
-[2026-11-19 00:06:17.876] TEST_PASS[fullscreen_parent_safe_gesture] closed, buttonVisibleFor=72ms
-[2026-11-19 00:06:17.902] GESTURE_OK at=1004,238
-[2026-11-19 00:06:18.008] VERIFIED pkg=com.flashskip (window changed, latency=439ms)
+[2026-11-21 19:57:03.780] TEST_LAB[fullscreen_parent] fullscreen trap + small skip shown
+[2026-11-21 19:57:03.802] TARGET session=5 attempt=2 via=text shake=false method=GESTURE dispatch=true eventAtMs=441207317 detectAtMs=441207332 actAtMs=441207333 matchUs=782 inputAtMs=441207336 inputReturnAtMs=441207339 dispatchRejection=-
+[2026-11-21 19:57:03.840] TEST_PASS[fullscreen_parent_safe_gesture] closed shownAtMs=441207317 closedAtMs=441207376 buttonVisibleFor=59ms
+[2026-11-21 19:57:03.853] GESTURE_OK session=5 attempt=2 callbackAtMs=441207390
+[2026-11-21 19:57:03.916] OUTCOME result=VERIFIED_CLOSED evidence=same_window_target_and_markers_absent session=5 attempt=2 method=GESTURE matchUs=782 detectToActMs=1 actToOutcomeMs=118 eventToConfirmedMs=134 eventToInputMs=19 inputToOutcomeMs=115
 
-[2026-11-19 00:06:20.897] TEST_LAB[fake_success] fake-success skip shown
-[2026-11-19 00:06:20.920] TEST_LAB[fake_success] fake-success ACTION_CLICK ignored!
-[2026-11-19 00:06:20.922] NODE_ACTION pkg=com.flashskip text='跳过' via=text shake=false b=860,173,1148,304 scr=1200x2664 sinceLaunch=457ms attempt=1
-[2026-11-19 00:06:21.180] RETRY_ESCALATE pkg=com.flashskip (still present, next attempt uses GESTURE)
-[2026-11-19 00:06:21.428] GESTURE pkg=com.flashskip text='跳过' via=text shake=false b=860,173,1148,304 scr=1200x2664 sinceLaunch=958ms attempt=2
-[2026-11-19 00:06:21.494] TEST_PASS[fake_success_escalated_gesture] closed, buttonVisibleFor=597ms
-[2026-11-19 00:06:21.521] GESTURE_OK at=1004,238
-[2026-11-19 00:06:21.698] VERIFIED pkg=com.flashskip (window changed, latency=958ms)
+[2026-11-21 19:57:07.095] TEST_LAB[fake_success] fake-success skip shown
+[2026-11-21 19:57:07.114] TEST_LAB[fake_success] fake-success ACTION_CLICK ignored!
+[2026-11-21 19:57:07.115] TARGET session=7 attempt=3 via=text shake=false method=NODE_ACTION dispatch=true eventAtMs=441210632 detectAtMs=441210646 actAtMs=441210646 matchUs=1827 inputAtMs=441210648 inputReturnAtMs=441210652 dispatchRejection=-
+[2026-11-21 19:57:07.202] OUTCOME result=STILL_PRESENT evidence=target_visible session=7 attempt=3 method=NODE_ACTION matchUs=1827 detectToActMs=0 actToOutcomeMs=92 eventToConfirmedMs=- eventToInputMs=16 inputToOutcomeMs=90
+[2026-11-21 19:57:07.216] TARGET session=7 attempt=4 via=text shake=false method=GESTURE dispatch=true eventAtMs=441210632 detectAtMs=441210746 actAtMs=441210746 matchUs=2992 inputAtMs=441210751 inputReturnAtMs=441210752 dispatchRejection=-
+[2026-11-21 19:57:07.254] TEST_PASS[fake_success_escalated_gesture] closed shownAtMs=441210632 closedAtMs=441210791 buttonVisibleFor=159ms
+[2026-11-21 19:57:07.256] GESTURE_OK session=7 attempt=4 callbackAtMs=441210793
+[2026-11-21 19:57:07.295] OUTCOME result=VERIFIED_CLOSED evidence=same_window_target_and_markers_absent session=7 attempt=4 method=GESTURE matchUs=2992 detectToActMs=0 actToOutcomeMs=85 eventToConfirmedMs=199 eventToInputMs=119 inputToOutcomeMs=80
 ```
 
 </details>
