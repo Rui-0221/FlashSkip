@@ -1,6 +1,7 @@
 package com.flashskip.a11y
 
 import android.graphics.Rect
+import android.os.SystemClock
 import android.view.accessibility.AccessibilityNodeInfo
 import com.flashskip.core.NodeSnapshot
 import com.flashskip.core.RectBounds
@@ -50,7 +51,8 @@ object NodeExtractor {
         activityName: String,
         screenWidth: Int,
         screenHeight: Int,
-        maxNodes: Int = MAX_NODES
+        maxNodes: Int = MAX_NODES,
+        refreshDeadlineMs: Long? = null
     ): ExtractedTree {
         val snapshots = ArrayList<NodeSnapshot>(128)
         val natives = ArrayList<AccessibilityNodeInfo>(128)
@@ -66,6 +68,13 @@ object NodeExtractor {
             while (queue.isNotEmpty() && snapshots.size < maxNodes) {
                 val item = queue.removeFirst()
                 val node = item.node
+                if (refreshDeadlineMs != null && (SystemClock.uptimeMillis() >= refreshDeadlineMs ||
+                        !runCatching { node.refresh() }.getOrDefault(false))
+                ) {
+                    recycleNode(node)
+                    complete = false
+                    break
+                }
                 val idx = snapshots.size
                 natives.add(node)
 

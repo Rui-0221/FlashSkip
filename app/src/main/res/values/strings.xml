@@ -45,4 +45,13 @@
     <string name="btn_close_test">关闭模拟页</string>
 
     <string name="guide">1. 为什么完全保护隐私？本应用没有申请联网权限，所有识别与记录只在手机本地完成，绝不上传任何内容。\n2. 为什么不会误点广告或支付按钮？闪跳只在打开软件的头几秒内工作，并内置防误触保护，自动避开“跳过引导”“领红包”“跳过付款”及全屏广告区域，同时默认排除系统界面、输入法与 19 款金融支付应用。\n3. 如何保证全天稳定不失效？请进入「后台保活」页完成权限、常驻通知、电量无限制与本机品牌自启动设置，并在最近任务中锁定闪跳卡片。</string>
+    <string name="experimental_skip_title">实验跳过（Shizuku）</string>
+    <string name="experimental_skip_off">已关闭，使用原有跳过方式。</string>
+    <string name="experimental_skip_paused">自动跳过总开关已暂停。</string>
+    <string name="experimental_skip_missing">未安装 Shizuku。安装并启动后可授权。</string>
+    <string name="experimental_skip_disconnected">Shizuku 未运行。启动后可重新连接。</string>
+    <string name="experimental_skip_unauthorized">尚未授权。关掉再开启可重试，也可在 Shizuku 中管理授权。</string>
+    <string name="experimental_skip_connecting">正在连接 Shizuku…</string>
+    <string name="experimental_skip_active">已启用 Shizuku 跳过。关闭即可切回原有方式。</string>
+    <string name="experimental_skip_unavailable">当前设备无法启动实验跳过。关掉再开启可重试。</string>
 </resources>

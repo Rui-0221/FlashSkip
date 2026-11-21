@@ -5,10 +5,13 @@ import android.accessibilityservice.GestureDescription
 import android.graphics.Path
 import android.graphics.Rect
 import android.os.Handler
+import android.os.SystemClock
 import android.view.accessibility.AccessibilityNodeInfo
 import com.flashskip.core.ActionCommand
 import com.flashskip.core.ClickMethod
-import com.flashskip.data.SkipLog
+import com.flashskip.core.RectBounds
+import com.flashskip.core.TargetEvidence
+import com.flashskip.core.sameControlIdentity
 
 /**
  * Executes skip clicks via node action or clamped screen-coordinate gesture,
@@ -16,10 +19,32 @@ import com.flashskip.data.SkipLog
  */
 object ActionExecutor {
 
+    enum class Rejection {
+        TARGET_UNAVAILABLE, TARGET_WINDOW_CHANGED, TARGET_IDENTITY_CHANGED, TARGET_INACTIVE,
+        TARGET_MOVED, RETRY_TARGET_CHANGED, TARGET_OUTSIDE_SCREEN, FOREGROUND_CHANGED, PLATFORM_REJECTED
+    }
+
     data class ExecutionResult(
         val dispatched: Boolean,
-        val actualMethod: ClickMethod
+        val actualMethod: ClickMethod,
+        val rejectedBy: Rejection? = null,
+        val inputStartedAtMs: Long? = null,
+        val inputReturnedAtMs: Long? = null
     )
+
+    fun reacquisitionEvidence(
+        result: ExecutionResult,
+        tree: ExtractedTree,
+        command: ActionCommand
+    ): TargetEvidence? {
+        if (result.dispatched || result.inputStartedAtMs != null || command.preferredMethod != ClickMethod.GESTURE ||
+            command.attemptNumber != 1 ||
+            (result.rejectedBy != Rejection.TARGET_UNAVAILABLE && result.rejectedBy != Rejection.TARGET_MOVED)
+        ) return null
+        val snapshot = tree.snapshot
+        val evidence = TargetEvidence(snapshot, command.decision, allowBoundedMovement = result.rejectedBy == Rejection.TARGET_MOVED)
+        return evidence.takeIf { it.matches(snapshot.nodes[command.decision.targetNodeIndex]) }
+    }
 
     fun execute(
         service: AccessibilityService,
@@ -30,52 +55,84 @@ object ActionExecutor {
         callbackHandler: Handler,
         canDispatch: () -> Boolean,
         onGestureOutcome: (sessionId: Long, attemptId: Long, completed: Boolean) -> Unit
+    ): ExecutionResult = executeWithTap(tree, command, canDispatch) { bounds ->
+        dispatchClampedTap(
+            service, bounds, screenWidth, screenHeight, callbackHandler,
+            onCompleted = { onGestureOutcome(command.sessionId, command.attemptId, true) },
+            onCancelled = { onGestureOutcome(command.sessionId, command.attemptId, false) }
+        )
+    }
+
+    fun executeWithTap(
+        tree: ExtractedTree,
+        command: ActionCommand,
+        canDispatch: () -> Boolean,
+        tap: (RectBounds) -> ExecutionResult
     ): ExecutionResult {
         val decision = command.decision
 
         if (command.preferredMethod == ClickMethod.NODE_ACTION) {
             val clickNode = tree.nodeAt(decision.clickNodeIndex)
-            val nodeOk = clickNode != null && canDispatch() &&
-                try {
+            if (clickNode != null && (clickNode.windowId != tree.windowId ||
+                    clickNode.packageName?.toString() != command.packageName)
+            ) {
+                return ExecutionResult(false, ClickMethod.NODE_ACTION, Rejection.TARGET_WINDOW_CHANGED)
+            }
+            if (!canDispatch()) {
+                return ExecutionResult(false, ClickMethod.NODE_ACTION, Rejection.FOREGROUND_CHANGED)
+            }
+            if (clickNode != null) {
+                val startedAt = SystemClock.uptimeMillis()
+                val accepted = try {
                     clickNode.performAction(AccessibilityNodeInfo.ACTION_CLICK)
                 } catch (_: Exception) {
                     false
                 }
-            if (nodeOk) {
-                return ExecutionResult(dispatched = true, actualMethod = ClickMethod.NODE_ACTION)
+                val returnedAt = SystemClock.uptimeMillis()
+                if (accepted || !command.allowImmediateGestureFallback) {
+                    return ExecutionResult(
+                        accepted, ClickMethod.NODE_ACTION,
+                        if (accepted) null else Rejection.PLATFORM_REJECTED,
+                        startedAt, returnedAt
+                    )
+                }
             }
-            if (!command.allowImmediateGestureFallback) {
-                return ExecutionResult(dispatched = false, actualMethod = ClickMethod.NODE_ACTION)
+            if (clickNode == null && !command.allowImmediateGestureFallback) {
+                return ExecutionResult(false, ClickMethod.NODE_ACTION, Rejection.TARGET_UNAVAILABLE)
             }
         }
 
         val target = tree.nodeAt(decision.targetNodeIndex)
-        val targetStillAtMatch = if (target == null) false else try {
-            if (!target.refresh() || !target.isVisibleToUser || !target.isEnabled) {
-                false
-            } else {
-                val bounds = Rect().also(target::getBoundsInScreen)
-                val retry = command.retryTarget
-                bounds.contains(decision.targetBounds.centerX.toInt(), decision.targetBounds.centerY.toInt()) &&
-                    (retry == null || (retry.matchesWindow(target.packageName?.toString().orEmpty(), target.windowId) &&
-                        retry.matches(tree.currentTarget(decision.targetNodeIndex, target, bounds))))
-            }
+            ?: return ExecutionResult(false, ClickMethod.GESTURE, Rejection.TARGET_UNAVAILABLE)
+        val refreshed = try {
+            target.refresh()
         } catch (_: Exception) {
             false
         }
-        if (!targetStillAtMatch || !canDispatch()) {
-            return ExecutionResult(dispatched = false, actualMethod = ClickMethod.GESTURE)
+        if (!refreshed) {
+            return ExecutionResult(false, ClickMethod.GESTURE, Rejection.TARGET_UNAVAILABLE)
         }
-        val gestureOk = dispatchClampedTap(
-            service = service,
-            bounds = decision.targetBounds,
-            screenWidth = screenWidth,
-            screenHeight = screenHeight,
-            callbackHandler = callbackHandler,
-            onCompleted = { onGestureOutcome(command.sessionId, command.attemptId, true) },
-            onCancelled = { onGestureOutcome(command.sessionId, command.attemptId, false) }
-        )
-        return ExecutionResult(dispatched = gestureOk, actualMethod = ClickMethod.GESTURE)
+        val bounds = Rect().also(target::getBoundsInScreen)
+        val currentTarget = tree.currentTarget(decision.targetNodeIndex, target, bounds)
+        val originalTarget = tree.snapshot.nodes[decision.targetNodeIndex]
+        val retry = command.retryTarget
+        val rejection = when {
+            target.windowId != tree.windowId || target.packageName?.toString() != command.packageName ->
+                Rejection.TARGET_WINDOW_CHANGED
+            !currentTarget.sameControlIdentity(originalTarget) -> Rejection.TARGET_IDENTITY_CHANGED
+            !currentTarget.isVisibleToUser || !currentTarget.isEnabled -> Rejection.TARGET_INACTIVE
+            originalTarget.viewId.isBlank() && originalTarget.effectiveText.isBlank() &&
+                currentTarget.bounds != originalTarget.bounds -> Rejection.TARGET_IDENTITY_CHANGED
+            !bounds.contains(decision.targetBounds.centerX.toInt(), decision.targetBounds.centerY.toInt()) ->
+                Rejection.TARGET_MOVED
+            retry != null && !retry.matches(currentTarget) -> Rejection.RETRY_TARGET_CHANGED
+            else -> null
+        }
+        if (rejection != null) return ExecutionResult(false, ClickMethod.GESTURE, rejection)
+        if (!canDispatch()) {
+            return ExecutionResult(false, ClickMethod.GESTURE, Rejection.FOREGROUND_CHANGED)
+        }
+        return tap(decision.targetBounds)
     }
 
     private fun dispatchClampedTap(
@@ -86,32 +143,32 @@ object ActionExecutor {
         callbackHandler: Handler,
         onCompleted: () -> Unit,
         onCancelled: () -> Unit
-    ): Boolean {
-        val clipped = bounds.clippedToScreen(screenWidth, screenHeight) ?: return false
+    ): ExecutionResult {
+        val clipped = bounds.clippedToScreen(screenWidth, screenHeight)
+            ?: return ExecutionResult(false, ClickMethod.GESTURE, Rejection.TARGET_OUTSIDE_SCREEN)
         val maxX = (screenWidth - 1).coerceAtLeast(1).toFloat()
         val maxY = (screenHeight - 1).coerceAtLeast(1).toFloat()
         val x = clipped.centerX.coerceIn(1f, maxX)
         val y = clipped.centerY.coerceIn(1f, maxY)
 
-        return try {
-            val path = Path().apply { moveTo(x, y) }
-            val stroke = GestureDescription.StrokeDescription(path, 0L, 35L)
-            val gesture = GestureDescription.Builder().addStroke(stroke).build()
-            val cb = object : AccessibilityService.GestureResultCallback() {
-                override fun onCompleted(gestureDescription: GestureDescription?) {
-                    SkipLog.log("GESTURE_OK at=${x.toInt()},${y.toInt()}")
-                    onCompleted()
-                }
+        val path = Path().apply { moveTo(x, y) }
+        val stroke = GestureDescription.StrokeDescription(path, 0L, 35L)
+        val gesture = GestureDescription.Builder().addStroke(stroke).build()
+        val cb = object : AccessibilityService.GestureResultCallback() {
+            override fun onCompleted(gestureDescription: GestureDescription?) = onCompleted()
 
-                override fun onCancelled(gestureDescription: GestureDescription?) {
-                    SkipLog.log("GESTURE_CANCELLED at=${x.toInt()},${y.toInt()}")
-                    onCancelled()
-                }
-            }
+            override fun onCancelled(gestureDescription: GestureDescription?) = onCancelled()
+        }
+        val startedAt = SystemClock.uptimeMillis()
+        val accepted = try {
             service.dispatchGesture(gesture, cb, callbackHandler)
-        } catch (e: Exception) {
-            SkipLog.log("GESTURE_ERROR ${e.message}")
+        } catch (_: Exception) {
             false
         }
+        return ExecutionResult(
+            accepted, ClickMethod.GESTURE,
+            if (accepted) null else Rejection.PLATFORM_REJECTED,
+            startedAt, SystemClock.uptimeMillis()
+        )
     }
 }

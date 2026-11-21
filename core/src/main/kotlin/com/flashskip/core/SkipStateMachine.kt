@@ -39,6 +39,7 @@ class SkipStateMachine(
     private var pendingAttempt: PendingAttempt? = null
     private var gestureRetryTarget: TargetEvidence? = null
     private var launchWindowId: Int? = null
+    private var resumeSession = false
     private var navigationDestination: ForegroundWindow? = null
     private var lastObserveLogAtMs: Long = 0L
     private var lastOutOfWindowSessionLogged: Long = -1L
@@ -59,7 +60,8 @@ class SkipStateMachine(
         selfTestPackage: String? = null,
         selfTestActivity: String? = null,
         windowId: Int? = null,
-        confirmedFullscreenActivity: Boolean = false
+        confirmedFullscreenActivity: Boolean = false,
+        confirmedForegroundEntry: Boolean = false
     ): VerifyOutcome {
         if (pkg.isBlank()) return VerifyOutcome.IGNORED_STALE
 
@@ -67,7 +69,9 @@ class SkipStateMachine(
             return VerifyOutcome.IGNORED_STALE
         }
         if (navigationDestination != null && windowId != null) {
-            if (navigationDestination == ForegroundWindow(pkg, windowId)) return VerifyOutcome.IGNORED_STALE
+            if (!confirmedForegroundEntry && navigationDestination == ForegroundWindow(pkg, windowId)) {
+                return VerifyOutcome.IGNORED_STALE
+            }
             navigationDestination = null
         }
 
@@ -78,13 +82,14 @@ class SkipStateMachine(
         val sameActivityRelaunched = confirmedFullscreenActivity && className.isNotBlank() &&
             className == activeActivity && launchWindowId != null && windowId != null && windowId != launchWindowId
         val newActivity = activityChanged || sameActivityRelaunched
+        val newSession = isNewPackage || newActivity || confirmedForegroundEntry
         val isSelfPackage = selfTestPackage != null && pkg == selfTestPackage
         val isSelfTestAllowed = isSelfPackage && className == selfTestActivity
         if (isSelfPackage && !isSelfTestAllowed && !isNewPackage && !activityChanged) {
             // Widget-class events in the test window must not disarm the test Activity.
             return VerifyOutcome.IGNORED_STALE
         }
-        val verifyOutcome = if (pendingAttempt != null && (isNewPackage || newActivity)) {
+        val verifyOutcome = if (pendingAttempt != null && newSession) {
             VerifyOutcome.NAVIGATED
         } else {
             VerifyOutcome.IGNORED_STALE
@@ -103,16 +108,31 @@ class SkipStateMachine(
         }
 
         if (verifyOutcome == VerifyOutcome.NAVIGATED ||
-            gestureRetryTarget != null && (isNewPackage || newActivity)
+            gestureRetryTarget != null && newSession
         ) {
             disarmToPackage(pkg, className)
-        } else if (isNewPackage || newActivity) {
+        } else if (newSession) {
             activePackage = pkg
             activeActivity = className
-            startNewSession(nowMs, windowId)
+            startNewSession(nowMs, windowId, confirmedForegroundEntry)
         }
 
         return verifyOutcome
+    }
+
+    /** Move the initial scan to a proved same-package window without renewing the deadline. */
+    fun moveWithinResume(
+        window: ForegroundWindow,
+        nowMs: Long,
+        windowMs: Long,
+        confirmedEntry: Boolean = false
+    ): Boolean {
+        if ((!resumeSession && !confirmedEntry) || !window.valid || window.packageName != activePackage ||
+            (!confirmedEntry && launchWindowId == window.id) || attempts != 0 || !isWithinWindow(nowMs, windowMs)
+        ) return false
+        resumeSession = true
+        launchWindowId = window.id
+        return true
     }
 
     /**
@@ -149,20 +169,12 @@ class SkipStateMachine(
             return EvaluationResult.NoOp
         }
 
-        if (pkg != activePackage) return EvaluationResult.NoOp
-
-        val clampedWindowMs = windowMs.coerceIn(MIN_WINDOW_MS, MAX_WINDOW_MS)
-        val actLower = activeActivity.ifEmpty { snapshot.activityName }.lowercase()
-        val isSplashActivity = actLower.contains("splash") ||
-            actLower.contains("advert") ||
-            actLower.contains("launchad")
-        val effectiveWindowMs = if (isSplashActivity) {
-            maxOf(clampedWindowMs, SPLASH_ACTIVITY_MIN_WINDOW_MS)
-        } else {
-            clampedWindowMs
+        if (pkg != activePackage || resumeSession && launchWindowId != null && snapshot.windowId != launchWindowId) {
+            return EvaluationResult.NoOp
         }
+
         val sinceLaunch = nowMs - launchAtMs
-        if (sinceLaunch > effectiveWindowMs) {
+        if (!isWithinWindow(nowMs, windowMs, activeActivity.ifEmpty { snapshot.activityName })) {
             armed = false
             return if (lastOutOfWindowSessionLogged != sessionId) {
                 lastOutOfWindowSessionLogged = sessionId
@@ -189,8 +201,7 @@ class SkipStateMachine(
 
         val decision = SkipMatcher.findBestMatch(snapshot, ruleIndex)
         if (retryTarget != null && (decision == null ||
-                !retryTarget.matches(snapshot.nodes[decision.targetNodeIndex]) ||
-                snapshot.nodes.count(retryTarget::matches) != 1)
+                !retryTarget.allowsRetry(snapshot, snapshot.nodes[decision.targetNodeIndex]))
         ) {
             cancelGestureRetry()
             return EvaluationResult.NoOp
@@ -228,13 +239,35 @@ class SkipStateMachine(
         return EvaluationResult.ExecuteClick(command)
     }
 
+    fun isWithinWindow(nowMs: Long, windowMs: Long, activityName: String = activeActivity): Boolean {
+        if (!armed) return false
+        val configuredMs = windowMs.coerceIn(MIN_WINDOW_MS, MAX_WINDOW_MS)
+        val activity = activityName.lowercase()
+        val isSplash = activity.contains("splash") || activity.contains("advert") || activity.contains("launchad")
+        val durationMs = if (isSplash) maxOf(configuredMs, SPLASH_ACTIVITY_MIN_WINDOW_MS) else configuredMs
+        return nowMs - launchAtMs <= durationMs
+    }
+
     /**
      * Records the actual method dispatched (in case NODE_ACTION returned false and fell back immediately).
      */
-    fun onActionDispatched(sessionId: Long, attemptId: Long, actualMethod: ClickMethod, ok: Boolean) {
+    fun onActionDispatched(
+        sessionId: Long,
+        attemptId: Long,
+        actualMethod: ClickMethod,
+        ok: Boolean,
+        refreshTargetBeforeInput: TargetEvidence? = null
+    ) {
         val pending = pendingAttemptFor(sessionId, attemptId) ?: return
         pending.method = actualMethod
-        if (!ok) finishVerification(sessionId, attemptId, VerifyOutcome.UNOBSERVED)
+        if (!ok) {
+            pendingAttempt = null
+            gestureRetryTarget = refreshTargetBeforeInput.takeIf {
+                actualMethod == ClickMethod.GESTURE && pending.command.preferredMethod == ClickMethod.GESTURE &&
+                    pending.command.attemptNumber == 1
+            }
+            armed = gestureRetryTarget != null
+        }
     }
 
     fun finishVerification(
@@ -298,11 +331,12 @@ class SkipStateMachine(
             return
         }
         activePackage = foregroundPkg
-        startNewSession(nowMs)
+        startNewSession(nowMs, resumed = true)
     }
 
-    private fun startNewSession(nowMs: Long, windowId: Int? = null) {
+    private fun startNewSession(nowMs: Long, windowId: Int? = null, resumed: Boolean = false) {
         sessionId++
+        resumeSession = resumed
         launchWindowId = windowId
         navigationDestination = null
         launchAtMs = nowMs
@@ -316,6 +350,7 @@ class SkipStateMachine(
 
     private fun disarmToPackage(pkg: String, className: String) {
         sessionId++
+        resumeSession = false
         launchWindowId = null
         activePackage = pkg
         activeActivity = className

@@ -145,6 +145,55 @@ class SkipStateMachineTest {
     }
 
     @Test
+    fun `verified foreground return rearms a previously disarmed Activity with the same window ID`() {
+        val window = splashWindow()
+        val id = requireNotNull(window.windowId)
+        val machine = SkipStateMachine()
+        machine.onWindowStateChanged(window.packageName, window.activityName, true, 1000L, windowId = id)
+        machine.onNavigationObserved(ForegroundWindow(window.packageName, id))
+        val previousSession = machine.sessionId
+        machine.onWindowStateChanged(
+            window.packageName, window.activityName, true, 32000L, windowId = id, confirmedFullscreenActivity = true
+        )
+        assertFalse(machine.armed)
+        assertEquals(previousSession, machine.sessionId)
+        machine.onWindowStateChanged(
+            window.packageName, window.activityName, true, 32050L, windowId = id, confirmedForegroundEntry = true
+        )
+        assertTrue(machine.armed)
+        assertEquals(32050L, machine.launchAtMs)
+        assertTrue(machine.evaluateSnapshot(window, 32500L, true, false, 6000L) is EvaluationResult.ExecuteClick)
+    }
+
+    @Test
+    fun `same package resume window changes keep the timer and reject stale nodes`() {
+        val initial = splashWindow()
+        val state = SkipStateMachine()
+        state.onWindowStateChanged(initial.packageName, initial.activityName, true, 1000L,
+            windowId = initial.windowId, confirmedForegroundEntry = true)
+        val session = state.sessionId
+        assertTrue(state.moveWithinResume(ForegroundWindow(initial.packageName, 4), 2200L, 6000L))
+        assertEquals(session, state.sessionId)
+        assertEquals(1000L, state.launchAtMs)
+        assertEquals(EvaluationResult.NoOp, state.evaluateSnapshot(initial, 2500L, true, false, 6000L))
+        assertTrue(state.evaluateSnapshot(initial.copy(windowId = 4), 2600L, true, false, 6000L)
+            is EvaluationResult.ExecuteClick)
+        assertFalse(state.moveWithinResume(ForegroundWindow(initial.packageName, 5), 2700L, 6000L))
+    }
+
+    @Test
+    fun `foreground return still excludes sensitive packages and overlays`() {
+        val machine = SkipStateMachine()
+        val window = splashWindow()
+        machine.onWindowStateChanged(window.packageName, window.activityName, true, 1000L)
+        val session = machine.sessionId
+        machine.onWindowStateChanged("com.android.systemui", "", true, 2000L, confirmedForegroundEntry = true)
+        assertEquals(session, machine.sessionId)
+        machine.onWindowStateChanged("com.tencent.mm", "", true, 3000L, confirmedForegroundEntry = true)
+        assertFalse(machine.armed)
+    }
+
+    @Test
     fun `unobserved attempt disarms and prevents an unverified retry`() {
         val fsm = SkipStateMachine()
         fsm.onWindowStateChanged("com.demo.news", "com.demo.news.SplashActivity", true, nowMs = 1000L)
@@ -156,6 +205,27 @@ class SkipStateMachineTest {
         )
         assertFalse(fsm.armed)
         assertEquals(EvaluationResult.NoOp, fsm.evaluateSnapshot(splashWindow(), 1600L, true, false, 6000L))
+    }
+
+    @Test
+    fun `a missing native target before input can be reacquired only once`() {
+        val initial = splashWindow().let { snapshot ->
+            snapshot.copy(nodes = listOf(snapshot.nodes.single().copy(text = "3 | 跳过")))
+        }
+        val fsm = SkipStateMachine()
+        fsm.onWindowStateChanged(initial.packageName, initial.activityName, true, 1000L)
+        val first = (fsm.evaluateSnapshot(initial, 1100L, true, false, 6000L) as EvaluationResult.ExecuteClick).command
+        val evidence = TargetEvidence(initial, first.decision)
+        assertEquals(ClickMethod.GESTURE, first.preferredMethod)
+        fsm.onActionDispatched(first.sessionId, first.attemptId, ClickMethod.GESTURE, false, evidence)
+
+        val fresh = initial.copy(nodes = listOf(initial.nodes.single().copy(text = "2 | 跳过")))
+        val retry = (fsm.evaluateSnapshot(fresh, 1120L, true, false, 6000L) as EvaluationResult.ExecuteClick).command
+        assertEquals(evidence, retry.retryTarget)
+        assertEquals(2, retry.attemptNumber)
+        fsm.onActionDispatched(retry.sessionId, retry.attemptId, ClickMethod.GESTURE, false, evidence)
+        assertFalse(fsm.armed)
+        assertEquals(EvaluationResult.NoOp, fsm.evaluateSnapshot(fresh, 1180L, true, false, 6000L))
     }
 
     @Test

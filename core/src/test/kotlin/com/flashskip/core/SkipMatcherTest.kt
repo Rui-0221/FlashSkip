@@ -190,6 +190,27 @@ class SkipMatcherTest {
     }
 
     @Test
+    fun `rejects center text that looks edge aligned behind a clipped window transition`() {
+        val win = makeWindow(
+            isFullScreen = false,
+            nodes = listOf(
+                node(0, bounds = RectBounds(480, 0, 1080, 2400), clickable = false, depth = 0),
+                node(1, parentIndex = 0, text = "跳过", bounds = RectBounds(933, 1630, 1073, 1740))
+            )
+        )
+        assertNull(SkipMatcher.findBestMatch(win, ruleIndex))
+    }
+
+    @Test
+    fun `rejects a screen center button even when a shortened root makes it look like a lower edge`() {
+        val win = makeWindow(nodes = listOf(
+            node(0, bounds = RectBounds(0, 0, 1080, 2110), clickable = false, depth = 0),
+            node(1, parentIndex = 0, text = "跳过", bounds = RectBounds(410, 1590, 670, 1700))
+        ))
+        assertNull(SkipMatcher.findBestMatch(win, ruleIndex))
+    }
+
+    @Test
     fun `rejects id-only match without visible ad context and allows with ad context`() {
         // Without ad context (MainActivity + invisible countdown) -> must reject
         val noContextWin = makeWindow(

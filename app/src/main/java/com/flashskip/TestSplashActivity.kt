@@ -1,6 +1,7 @@
 package com.flashskip
 
 import android.annotation.SuppressLint
+import android.app.Dialog
 import android.content.Intent
 import android.graphics.Canvas
 import android.graphics.Color
@@ -12,6 +13,7 @@ import android.os.SystemClock
 import android.view.MotionEvent
 import android.view.Gravity
 import android.view.View
+import android.view.WindowManager
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -71,6 +73,8 @@ class TestSplashActivity : AppCompatActivity() {
     private var extraTarget: View? = null
     private var closed = false
     private var trace: RunTrace? = null
+    private var warmResumeCount = 0
+    private var hotDialog: Dialog? = null
 
     @SuppressLint("ClickableViewAccessibility")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -105,6 +109,17 @@ class TestSplashActivity : AppCompatActivity() {
             "countdown" -> setupAdButton("倒计时广告", "3 | 跳过")
             "fullscreen_overlay" -> setupFullScreenOverlay()
             "shake" -> setupAdButton("摇一摇查看详情", "跳过")
+            "warm_resume" -> {
+                tvAdTitle.text = "回到前台后显示模拟开屏广告"
+                tvAdTitle.contentDescription = null
+                btnSkip.text = "跳过"
+                btnSkip.setOnClickListener { closeSuccess(scenario) }
+            }
+            "hot_window_close", "hot_window_redirect", "hot_window_unknown" -> {
+                tvAdTitle.text = "独立窗口回前台靶场"
+                tvAdTitle.contentDescription = null
+                btnBackManual.visibility = View.VISIBLE
+            }
             "redirect" -> setupAdButton("导流对照", "跳过") {
                 logTest("TEST_NAV[$scenario] destination=MainActivity")
                 finish()
@@ -451,6 +466,50 @@ class TestSplashActivity : AppCompatActivity() {
         super.onResume()
         resumedTrace = trace
         logLifecycle("resumed")
+        if (scenario == "warm_resume" && ++warmResumeCount == 2) {
+            tvAdTitle.contentDescription = "广告"
+            showTarget(btnSkip, delayMs = 900)
+        }
+        if (scenario.startsWith("hot_window_") && ++warmResumeCount == 2) {
+            handler.postDelayed({ showHotDialog() }, 220)
+        }
+    }
+
+    private fun showHotDialog(destination: Boolean = false) {
+        if (isFinishing || isDestroyed) return
+        val dialog = Dialog(this, android.R.style.Theme_Material_NoActionBar)
+        dialog.setContentView(R.layout.activity_test_splash)
+        val title = dialog.findViewById<TextView>(R.id.tvAdTitle)
+        title.text = if (destination) "应用内落地页" else "模拟全屏广告"
+        title.contentDescription = if (destination) null else "广告"
+        val skip = dialog.findViewById<Button>(R.id.btnSkip)
+        skip.text = "跳过"
+        skip.setOnClickListener {
+            logTest("TEST_TAP[$scenario] close control received")
+            dialog.dismiss()
+            if (scenario == "hot_window_redirect") showHotDialog(destination = true)
+        }
+        if (!destination && scenario == "hot_window_unknown") {
+            // Exercise an unmapped type using the test Activity's own window token.
+            dialog.window?.setType(WindowManager.LayoutParams.LAST_APPLICATION_WINDOW)
+        }
+        hotDialog = dialog
+        dialog.show()
+        dialog.window?.setLayout(-1, -1)
+        if (destination) {
+            logTest("TEST_DEST[$scenario] another same-app window")
+            return
+        }
+        logTest("TEST_WINDOW[$scenario] top window attached")
+        handler.postDelayed({
+            if (!dialog.isShowing) return@postDelayed
+            skip.visibility = View.VISIBLE
+            skip.post {
+                val origin = IntArray(2)
+                skip.getLocationOnScreen(origin)
+                logTest("TEST_LAB[$scenario] shown tapX=${origin[0] + skip.width / 2} tapY=${origin[1] + skip.height / 2}")
+            }
+        }, 1800)
     }
 
     override fun onPause() {
@@ -470,6 +529,7 @@ class TestSplashActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         logLifecycle("destroyed")
+        hotDialog?.dismiss()
         handler.removeCallbacksAndMessages(null)
         labWebView?.let {
             splashRoot.removeView(it)

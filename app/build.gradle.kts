@@ -12,8 +12,8 @@ android {
         applicationId = "com.flashskip"
         minSdk = 26
         targetSdk = 34
-        versionCode = 9
-        versionName = "0.7.0-m1"
+        versionCode = 10
+        versionName = "0.8.0"
     }
 
     buildTypes {
@@ -32,6 +32,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    buildFeatures {
+        aidl = true
+    }
+
     kotlinOptions {
         jvmTarget = "17"
     }
@@ -42,6 +46,8 @@ dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("com.google.android.material:material:1.12.0")
+    implementation("dev.rikka.shizuku:api:13.1.5")
+    implementation("dev.rikka.shizuku:provider:13.1.5")
 
     testImplementation("junit:junit:4.13.2")
 }

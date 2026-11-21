@@ -44,4 +44,58 @@ class ForegroundEventsTest {
         assertFalse(events.acceptsStateHint(destination, null))
         assertTrue(events.acceptsStateHint(destination, destination))
     }
+
+    @Test
+    fun `a departure signal probes past the old root and stops after the focused app changes`() {
+        val events = ForegroundEvents()
+        events.observeRoot(previous, 900L)
+        events.onForegroundSignal(1000L)
+        events.onWindowSignal(previous.id, 1001L)
+        assertEquals(1032L, events.observeRoot(previous, 1001L))
+        assertEquals(1080L, events.observeRoot(null, 1032L))
+        assertNull(events.observeRoot(destination, 1080L))
+        assertNull(events.observeRoot(null, 1140L))
+    }
+
+    @Test
+    fun `resume window hints schedule late probes without renewing the deadline`() {
+        val events = ForegroundEvents()
+        events.recordFocusedApplication(previous)
+        events.onResumeWindowHint(destination, 1000L)
+        events.recordFocusedApplication(destination)
+        assertEquals(1140L, events.observeRoot(destination, 1000L))
+        assertEquals(1900L, events.observeRoot(destination, 1450L))
+        val replacement = destination.copy(id = 99)
+        events.onResumeWindowHint(replacement, 3300L)
+        assertEquals(replacement, events.resumeWindow(3500L))
+        assertNull(events.resumeWindow(4800L))
+        events.cancelWindowProbes()
+        assertNull(events.observeRoot(replacement, 3600L))
+    }
+
+    @Test
+    fun `unmapped window keeps the original application window as return evidence`() {
+        val events = ForegroundEvents()
+        events.recordFocusedApplication(previous)
+        events.rememberReturnWindow(previous)
+        events.recordFocusedApplication(destination)
+        events.onResumeWindowHint(previous.copy(id = 20), 1000L)
+        val overlay = previous.copy(id = 20)
+        events.recordFocusedApplication(overlay)
+        assertEquals(previous, events.returnWindowFor(overlay))
+        events.recordFocusedApplication(previous)
+        assertNull(events.returnWindowFor(previous))
+    }
+
+    @Test
+    fun `ordinary window changes and missing roots cannot simulate leaving and returning`() {
+        val events = ForegroundEvents()
+        assertFalse(events.recordFocusedApplication(previous))
+        assertFalse(events.recordFocusedApplication(previous.copy(id = 9)))
+        events.observeRoot(null, 1000L)
+        assertFalse(events.recordFocusedApplication(previous))
+        assertTrue(events.recordFocusedApplication(destination))
+        assertTrue(events.recordFocusedApplication(previous))
+        assertFalse(events.recordFocusedApplication(previous))
+    }
 }

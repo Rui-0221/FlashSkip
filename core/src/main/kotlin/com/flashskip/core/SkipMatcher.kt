@@ -103,6 +103,14 @@ object SkipMatcher {
         val rootBounds = window.nodes.firstOrNull()?.bounds?.takeIf {
             it.width >= window.screenWidth * 0.85f && it.height >= window.screenHeight * 0.85f
         }
+        // Accessibility can clip a sliding window to the display edge. Its content is not edge-aligned.
+        if (!hasFullScreenRoot) return null
+        if (rootBounds != null) {
+            val visibleRoot = rootBounds.clippedToScreen(window.screenWidth, window.screenHeight) ?: return null
+            if (visibleRoot.width < window.screenWidth * 0.90f ||
+                visibleRoot.height < window.screenHeight * 0.85f
+            ) return null
+        }
         var best: MatchDecision? = null
 
         for (node in window.nodes) {
@@ -300,16 +308,16 @@ object SkipMatcher {
         screenHeight: Int,
         rootBounds: RectBounds? = null
     ): Boolean {
-        val refLeft = rootBounds?.left ?: 0
-        val refTop = rootBounds?.top ?: 0
-        val refW = (rootBounds?.width ?: screenWidth).coerceAtLeast(1)
-        val refH = (rootBounds?.height ?: screenHeight).coerceAtLeast(1)
-        val rx = (bounds.centerX - refLeft) / refW.toFloat()
-        val ry = (bounds.centerY - refTop) / refH.toFloat()
-        val inCenterX = rx in 0.20f..0.80f
-        val inCenterY = ry in 0.25f..0.75f
-        return !(inCenterX && inCenterY)
+        val screenX = bounds.centerX / screenWidth.coerceAtLeast(1)
+        val screenY = bounds.centerY / screenHeight.coerceAtLeast(1)
+        if (isCentral(screenX, screenY)) return false
+        if (rootBounds == null) return true
+        val rootX = (bounds.centerX - rootBounds.left) / rootBounds.width.coerceAtLeast(1)
+        val rootY = (bounds.centerY - rootBounds.top) / rootBounds.height.coerceAtLeast(1)
+        return !isCentral(rootX, rootY)
     }
+
+    private fun isCentral(x: Float, y: Float): Boolean = x in 0.20f..0.80f && y in 0.25f..0.75f
 
     private fun computePositionBonus(
         bounds: RectBounds,

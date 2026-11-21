@@ -44,6 +44,21 @@ class TargetEvidenceTest {
     }
 
     @Test
+    fun `return window uses its current visible semantics and requires stable clean evidence`() {
+        val evidence = TargetEvidence(window(button, marker), decision)
+        val content = marker.copy(text = "首页")
+        val destination = window(content).copy(windowId = 8)
+        assertEquals(TargetObservation.ABSENT, evidence.observeReturn(destination))
+        assertEquals(TargetObservation.UNOBSERVED, evidence.observeReturn(destination.copy(complete = false)))
+        assertEquals(TargetObservation.AD_PRESENT, evidence.observeReturn(window(content.copy(text = "推广")).copy(windowId = 8)))
+        val stability = evidence.crossWindowClosureCheck(1000L)
+        assertFalse(stability.record(TargetObservation.ABSENT, 1120L))
+        assertFalse(stability.record(TargetObservation.AD_PRESENT, 1230L))
+        assertFalse(stability.record(TargetObservation.ABSENT, 1240L))
+        assertTrue(stability.record(TargetObservation.ABSENT, 1340L))
+    }
+
+    @Test
     fun `IDs never fall back to labels and ID-less countdowns require stable semantic identity`() {
         val evidence = TargetEvidence(window(button), decision)
         val replacement = button.copy(viewId = "demo:id/replacement")
@@ -53,11 +68,26 @@ class TargetEvidenceTest {
         assertEquals(TargetObservation.AD_PRESENT, evidence.observe(window(replacement)))
 
         val countdown = button.copy(viewId = "", text = "跳过 3s")
+        assertTrue(countdown.sameControlIdentity(countdown.copy(text = "跳过 2s")))
+        assertFalse(countdown.sameControlIdentity(countdown.copy(text = "跳过引导")))
+        assertFalse(button.sameControlIdentity(replacement))
         val noId = TargetEvidence(window(countdown), decision)
         assertTrue(noId.matches(countdown.copy(text = "跳过 2s")))
         assertFalse(noId.matches(countdown.copy(text = "关闭广告")))
         assertFalse(noId.matches(countdown.copy(bounds = RectBounds(850, 100, 1040, 200))))
         val unlabeled = countdown.copy(text = "")
         assertFalse(TargetEvidence(window(unlabeled), decision).matches(unlabeled))
+    }
+
+    @Test
+    fun `only a unique identified nearby control may be reacquired after it moves`() {
+        val evidence = TargetEvidence(window(button), decision, allowBoundedMovement = true)
+        val moved = button.copy(bounds = RectBounds(820, 100, 960, 200))
+        assertTrue(evidence.allowsRetry(window(moved), moved))
+        assertFalse(evidence.allowsRetry(window(moved, complete = false), moved))
+        assertFalse(evidence.allowsRetry(window(moved, button.copy(index = 2)), moved))
+        assertFalse(evidence.matches(moved.copy(viewId = "demo:id/replacement")))
+        assertFalse(evidence.matches(moved.copy(bounds = RectBounds(600, 100, 740, 200))))
+        assertFalse(TargetEvidence(window(button), decision).matches(moved))
     }
 }

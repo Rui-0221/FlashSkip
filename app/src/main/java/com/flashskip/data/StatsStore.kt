@@ -19,6 +19,7 @@ class StatsStore(context: Context) {
         context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     companion object {
+        private const val KEY_EXPERIMENTAL_SKIP = "experimental_skip_enabled"
         const val PREFS_NAME = "flashskip_prefs"
         private const val KEY_MASTER = "master_enabled"
         private const val KEY_OBSERVE = "observe_only"
@@ -54,6 +55,23 @@ class StatsStore(context: Context) {
     var observeOnly: Boolean
         get() = prefs.getBoolean(KEY_OBSERVE, false)
         set(value) = prefs.edit().putBoolean(KEY_OBSERVE, value).apply()
+
+    var experimentalSkipEnabled: Boolean
+        get() = prefs.getBoolean(KEY_EXPERIMENTAL_SKIP, false)
+        set(value) = prefs.edit().putBoolean(KEY_EXPERIMENTAL_SKIP, value).apply()
+
+    fun observeSkipSettings(onChanged: () -> Unit) {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            when (key) {
+                KEY_MASTER, KEY_OBSERVE, KEY_WINDOW_MS, KEY_DISABLED_PKGS, KEY_EXPERIMENTAL_SKIP -> onChanged()
+                else -> Unit
+            }
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        skipSettingsListener = listener
+    }
+
+    private var skipSettingsListener: SharedPreferences.OnSharedPreferenceChangeListener? = null
 
     var skipToastEnabled: Boolean
         get() = prefs.getBoolean(KEY_SKIP_TOAST, true)
