@@ -3,6 +3,7 @@ package com.flashskip.ui
 import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
@@ -16,10 +17,11 @@ import androidx.appcompat.widget.AppCompatButton
 import com.flashskip.R
 
 /**
- * Dual-theme action button supporting:
+ * Tri-theme action button supporting:
  * - Consumer rounded pill/soft-rect buttons (Classic style).
  * - Endfield 45-degree bottom-right cut-corner buttons with mechanical left-to-right wipe
  *   (PathInterpolator(0.7, 0, 0.2, 1), 100ms press / 280ms release) and Saira 700/112% typography.
+ * - Meow chibi-cat candy-lip pill buttons with springy press-down feel, top gloss, and subtle paw accent.
  * Respects system reduced-motion settings and renders a high-contrast 2dp focus outline.
  */
 class EfButton @JvmOverloads constructor(
@@ -183,6 +185,7 @@ class EfButton @JvmOverloads constructor(
         }
 
         val endfield = FlashTheme.isEndfield(context)
+        val meow = FlashTheme.isMeow(context)
         val p = FlashTheme.palette(context)
         val density = resources.displayMetrics.density
 
@@ -234,6 +237,73 @@ class EfButton @JvmOverloads constructor(
                     useCutCorners = true
                 )
                 canvas.drawPath(focusPath, focusPaint)
+            }
+        } else if (meow) {
+            val lipH = 3f * density
+            val pressShift = (2f * density) * wipeFraction.coerceIn(0f, 1f)
+            val faceTop = pressShift
+            val faceBottom = (h - lipH + pressShift * 0.5f).coerceAtLeast(faceTop + 8f)
+            val radius = (if (small) 16f else 20f) * density
+            val r = radius.coerceAtMost(minOf(w, faceBottom - faceTop) * 0.5f)
+
+            // Candy 3D bottom lip
+            val lipColor = when {
+                !isEnabled -> p.rule
+                kind == Kind.GO -> p.signalWipeOnGo
+                kind == Kind.DANGER -> p.danger
+                else -> p.rule
+            }
+            rectF.set(0f, faceTop + lipH - pressShift * 0.5f, w, h)
+            bgPaint.color = lipColor
+            bgPaint.alpha = if (isEnabled) 255 else 135
+            canvas.drawRoundRect(rectF, r, r, bgPaint)
+
+            // Main candy button face
+            rectF.set(0f, faceTop, w, faceBottom)
+            bgPaint.color = restColor
+            bgPaint.alpha = if (isEnabled) 255 else 150
+            canvas.drawRoundRect(rectF, r, r, bgPaint)
+
+            if (wipeFraction > 0f) {
+                wipePaint.color = pressColor
+                wipePaint.alpha = (255 * wipeFraction).toInt().coerceIn(0, 255)
+                canvas.drawRoundRect(rectF, r, r, wipePaint)
+            }
+
+            // Soft top highlight pill
+            if (isEnabled) {
+                wipePaint.color = Color.WHITE
+                wipePaint.alpha = if (p.isDark) 24 else 68
+                val hiPad = maxOf(r * 0.65f, 10f * density)
+                if (w - hiPad * 2 > 8f * density) {
+                    canvas.drawRoundRect(
+                        RectF(hiPad, faceTop + 2.5f * density, w - hiPad, faceTop + 5f * density),
+                        2f * density,
+                        2f * density,
+                        wipePaint
+                    )
+                }
+            }
+
+            // Subtle decorative mini paw on primary GO button (left edge, never colliding with centered text)
+            if (kind == Kind.GO && w > 110f * density) {
+                wipePaint.color = p.onSignal
+                wipePaint.alpha = 46
+                MeowBackdropView.drawMiniPaw(
+                    canvas = canvas,
+                    cx = 20f * density,
+                    cy = (faceTop + faceBottom) * 0.5f,
+                    radius = 7.5f * density,
+                    angleDeg = -14f,
+                    paint = wipePaint
+                )
+            }
+
+            if (isFocused) {
+                focusPaint.color = p.trace
+                val half = focusPaint.strokeWidth / 2f
+                rectF.set(half, faceTop + half, w - half, faceBottom - half)
+                canvas.drawRoundRect(rectF, (r - half).coerceAtLeast(0f), (r - half).coerceAtLeast(0f), focusPaint)
             }
         } else {
             val cornerSize = if (customRadiusPx >= 0f) {

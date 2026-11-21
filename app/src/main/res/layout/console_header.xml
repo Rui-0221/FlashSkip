@@ -31,12 +31,13 @@
                 android:importantForAccessibility="no"
                 android:src="@drawable/ic_ef_flash_seal" />
 
-            <View
+            <ImageView
                 android:id="@+id/vEndfieldMark"
-                android:layout_width="10dp"
-                android:layout_height="10dp"
-                android:background="#FFFA00"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:contentDescription="@null"
                 android:importantForAccessibility="no"
+                android:src="@drawable/ic_ef_tactical_mark"
                 android:visibility="gone" />
 
             <LinearLayout

@@ -16,7 +16,7 @@
         android:paddingBottom="28dp"
         android:visibility="visible">
 
-        <!-- 0. Endfield Hero Wordmark Header (only shown when Endfield UI theme is selected) -->
+        <!-- 0. Endfield Hero Wordmark Header & Tactical HUD (only shown when Endfield UI theme is selected) -->
         <LinearLayout
             android:id="@+id/efHomeDisplayHeader"
             android:layout_width="match_parent"
@@ -32,13 +32,33 @@
                 android:text="// LOCAL GUARD │ OFFLINE"
                 android:textSize="11sp" />
 
-            <TextView
-                android:id="@+id/efHomeWordmark"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
-                android:text="FLASHSKIP"
-                android:textSize="32sp" />
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/efHomeWordmark"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="FLASHSKIP"
+                    android:textSize="30sp" />
+
+                <TextView
+                    android:id="@+id/efHomeUnitBadge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:paddingStart="8dp"
+                    android:paddingTop="3dp"
+                    android:paddingEnd="11dp"
+                    android:paddingBottom="3dp"
+                    android:text="UNIT.08"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
 
             <TextView
                 android:id="@+id/efHomeSubheadline"
@@ -48,6 +68,72 @@
                 android:text="自动跳过开屏广告控制台"
                 android:textSize="15sp"
                 android:textStyle="bold" />
+
+            <com.flashskip.ui.EfTechHudStripView
+                android:id="@+id/efHomeHudStrip"
+                android:layout_width="match_parent"
+                android:layout_height="42dp"
+                android:layout_marginTop="10dp" />
+        </LinearLayout>
+
+        <!-- 0.5 Meow Chibi-Cat Interactive Hero Card (only shown when Meow UI theme is selected) -->
+        <LinearLayout
+            android:id="@+id/meowHomeHeroHeader"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="14dp"
+            android:paddingTop="24dp"
+            android:paddingEnd="16dp"
+            android:paddingBottom="16dp"
+            android:visibility="gone">
+
+            <com.flashskip.ui.MeowCatMascotView
+                android:id="@+id/meowCatMascot"
+                android:layout_width="116dp"
+                android:layout_height="104dp" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tvMeowMoodTag"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:paddingStart="10dp"
+                    android:paddingTop="3dp"
+                    android:paddingEnd="10dp"
+                    android:paddingBottom="3dp"
+                    android:text="元气守护中"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvMeowSpeech"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:lineSpacingMultiplier="1.38"
+                    android:text="喵~ 小猫已就位，打开其他应用时会自动帮你拍掉开屏广告！"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvMeowPetHint"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="轻点美短小猫可以摸摸头 ★"
+                    android:textSize="12sp" />
+            </LinearLayout>
         </LinearLayout>
 
         <!-- 1. Hero Protection Status Card -->
@@ -335,7 +421,7 @@
             <com.flashskip.ui.EfSegmentBarView
                 android:id="@+id/segReadiness"
                 android:layout_width="match_parent"
-                android:layout_height="8dp"
+                android:layout_height="wrap_content"
                 android:layout_marginTop="10dp" />
 
             <TextView
@@ -1081,12 +1167,209 @@
                 android:textSize="13sp" />
         </LinearLayout>
 
-        <!-- 1. Exclusions Card -->
+        <!-- 1. Appearance Card (Tri-Style + Light/Dark Mode) -->
+        <LinearLayout
+            android:id="@+id/cardAppearance"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:background="@drawable/ef_panel_bg"
+            android:orientation="vertical"
+            android:padding="18dp">
+
+            <TextView
+                android:id="@+id/efEyebrowStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="4dp"
+                android:text="// APPEARANCE"
+                android:textSize="11sp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/tvAppearanceTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="界面外观"
+                android:textColor="@color/ef_ink"
+                android:textSize="16.5sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvAppearanceDesc"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:lineSpacingMultiplier="1.4"
+                android:text="可切换「日常简约」「终末地」与「软萌猫咪」三套界面风格，均支持浅色、深色与跟随系统。"
+                android:textColor="@color/ef_ink_2"
+                android:textSize="13.5sp" />
+
+            <TextView
+                android:id="@+id/tvThemeStyleLabel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="界面风格"
+                android:textColor="@color/ef_ink"
+                android:textSize="13.5sp"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:id="@+id/segStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/fs_tile_bg"
+                android:orientation="horizontal"
+                android:padding="4dp">
+
+                <TextView
+                    android:id="@+id/segStyleClassic"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:maxLines="2"
+                    android:minHeight="48dp"
+                    android:paddingStart="4dp"
+                    android:paddingTop="8dp"
+                    android:paddingEnd="4dp"
+                    android:paddingBottom="8dp"
+                    android:text="日常简约"
+                    android:textColor="@color/ef_ink"
+                    android:textSize="13.5sp" />
+
+                <TextView
+                    android:id="@+id/segStyleEndfield"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:layout_weight="1"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:maxLines="2"
+                    android:minHeight="48dp"
+                    android:paddingStart="4dp"
+                    android:paddingTop="8dp"
+                    android:paddingEnd="4dp"
+                    android:paddingBottom="8dp"
+                    android:text="终末地"
+                    android:textColor="@color/ef_ink"
+                    android:textSize="13.5sp" />
+
+                <TextView
+                    android:id="@+id/segStyleMeow"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:layout_weight="1"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:maxLines="2"
+                    android:minHeight="48dp"
+                    android:paddingStart="4dp"
+                    android:paddingTop="8dp"
+                    android:paddingEnd="4dp"
+                    android:paddingBottom="8dp"
+                    android:text="软萌猫咪"
+                    android:textColor="@color/ef_ink"
+                    android:textSize="13.5sp" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tvStyleActiveDesc"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="当前为日常简约风格：圆润卡片、柔和留白与清晰配色"
+                android:textColor="@color/ef_ink_2"
+                android:textSize="12.5sp" />
+
+            <TextView
+                android:id="@+id/tvThemeModeLabel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:text="明暗配色"
+                android:textColor="@color/ef_ink"
+                android:textSize="13.5sp"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:id="@+id/segTheme"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/fs_tile_bg"
+                android:orientation="horizontal"
+                android:padding="4dp">
+
+                <TextView
+                    android:id="@+id/segThemeSystem"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:minHeight="48dp"
+                    android:paddingStart="8dp"
+                    android:paddingTop="8dp"
+                    android:paddingEnd="8dp"
+                    android:paddingBottom="8dp"
+                    android:text="跟随系统"
+                    android:textColor="@color/ef_ink"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:id="@+id/segThemeLight"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:layout_weight="1"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:minHeight="48dp"
+                    android:paddingStart="8dp"
+                    android:paddingTop="8dp"
+                    android:paddingEnd="8dp"
+                    android:paddingBottom="8dp"
+                    android:text="浅色"
+                    android:textColor="@color/ef_ink"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:id="@+id/segThemeDark"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:layout_weight="1"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:minHeight="48dp"
+                    android:paddingStart="8dp"
+                    android:paddingTop="8dp"
+                    android:paddingEnd="8dp"
+                    android:paddingBottom="8dp"
+                    android:text="深色"
+                    android:textColor="@color/ef_ink"
+                    android:textSize="14sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- 2. Exclusions Card -->
         <LinearLayout
             android:id="@+id/sectionExclusions"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
+            android:layout_marginTop="16dp"
             android:background="@drawable/ef_panel_bg"
             android:orientation="vertical"
             android:padding="18dp">
@@ -1200,182 +1483,6 @@
                     app:efKind="normal"
                     app:efSmall="true" />
             </com.flashskip.ui.EfWrapLayout>
-        </LinearLayout>
-
-        <!-- 2. Appearance Card (Dual Visual Style + Light/Dark Mode) -->
-        <LinearLayout
-            android:id="@+id/cardAppearance"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:background="@drawable/ef_panel_bg"
-            android:orientation="vertical"
-            android:padding="18dp">
-
-            <TextView
-                android:id="@+id/efEyebrowStyle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="4dp"
-                android:text="// APPEARANCE"
-                android:textSize="11sp"
-                android:visibility="gone" />
-
-            <TextView
-                android:id="@+id/tvAppearanceTitle"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="界面外观"
-                android:textColor="@color/ef_ink"
-                android:textSize="16.5sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/tvAppearanceDesc"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:lineSpacingMultiplier="1.4"
-                android:text="可切换「日常简约」或「终末地」两套界面风格，均支持浅色、深色与跟随系统。"
-                android:textColor="@color/ef_ink_2"
-                android:textSize="13.5sp" />
-
-            <TextView
-                android:id="@+id/tvThemeStyleLabel"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:text="界面风格"
-                android:textColor="@color/ef_ink"
-                android:textSize="13.5sp"
-                android:textStyle="bold" />
-
-            <LinearLayout
-                android:id="@+id/segStyle"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:background="@drawable/fs_tile_bg"
-                android:orientation="horizontal"
-                android:padding="4dp">
-
-                <TextView
-                    android:id="@+id/segStyleClassic"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center"
-                    android:minHeight="48dp"
-                    android:paddingStart="8dp"
-                    android:paddingTop="8dp"
-                    android:paddingEnd="8dp"
-                    android:paddingBottom="8dp"
-                    android:text="日常简约"
-                    android:textColor="@color/ef_ink"
-                    android:textSize="14sp" />
-
-                <TextView
-                    android:id="@+id/segStyleEndfield"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="4dp"
-                    android:layout_weight="1"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center"
-                    android:minHeight="48dp"
-                    android:paddingStart="8dp"
-                    android:paddingTop="8dp"
-                    android:paddingEnd="8dp"
-                    android:paddingBottom="8dp"
-                    android:text="终末地"
-                    android:textColor="@color/ef_ink"
-                    android:textSize="14sp" />
-            </LinearLayout>
-
-            <TextView
-                android:id="@+id/tvStyleActiveDesc"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:text="当前为日常简约风格：圆润卡片、柔和留白与清晰配色"
-                android:textColor="@color/ef_ink_2"
-                android:textSize="12.5sp" />
-
-            <TextView
-                android:id="@+id/tvThemeModeLabel"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
-                android:text="明暗配色"
-                android:textColor="@color/ef_ink"
-                android:textSize="13.5sp"
-                android:textStyle="bold" />
-
-            <LinearLayout
-                android:id="@+id/segTheme"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:background="@drawable/fs_tile_bg"
-                android:orientation="horizontal"
-                android:padding="4dp">
-
-                <TextView
-                    android:id="@+id/segThemeSystem"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center"
-                    android:minHeight="48dp"
-                    android:paddingStart="8dp"
-                    android:paddingTop="8dp"
-                    android:paddingEnd="8dp"
-                    android:paddingBottom="8dp"
-                    android:text="跟随系统"
-                    android:textColor="@color/ef_ink"
-                    android:textSize="14sp" />
-
-                <TextView
-                    android:id="@+id/segThemeLight"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="4dp"
-                    android:layout_weight="1"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center"
-                    android:minHeight="48dp"
-                    android:paddingStart="8dp"
-                    android:paddingTop="8dp"
-                    android:paddingEnd="8dp"
-                    android:paddingBottom="8dp"
-                    android:text="浅色"
-                    android:textColor="@color/ef_ink"
-                    android:textSize="14sp" />
-
-                <TextView
-                    android:id="@+id/segThemeDark"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="4dp"
-                    android:layout_weight="1"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center"
-                    android:minHeight="48dp"
-                    android:paddingStart="8dp"
-                    android:paddingTop="8dp"
-                    android:paddingEnd="8dp"
-                    android:paddingBottom="8dp"
-                    android:text="深色"
-                    android:textColor="@color/ef_ink"
-                    android:textSize="14sp" />
-            </LinearLayout>
         </LinearLayout>
 
         <!-- 3. Privacy & Safety Guide Card -->
@@ -1595,7 +1702,7 @@
                 <com.flashskip.ui.EfSegmentBarView
                     android:id="@+id/segWindowBar"
                     android:layout_width="match_parent"
-                    android:layout_height="8dp"
+                    android:layout_height="wrap_content"
                     android:layout_marginTop="10dp" />
 
                 <LinearLayout

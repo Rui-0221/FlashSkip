@@ -34,13 +34,52 @@ object ConsoleFormatter {
 
     enum class ThemeStyleOption(val key: String, val label: String, val description: String) {
         CLASSIC("classic", "日常简约", "圆润卡片与清晰日常风格"),
-        ENDFIELD("endfield", "终末地", "工业手册风格 · 切角与电光黄高亮");
+        ENDFIELD("endfield", "终末地", "工业手册风格 · 等高线与电光黄高亮"),
+        MEOW("meow", "软萌猫咪", "美短加白猫咪主题 · 海盐奶蓝与互动猫猫");
 
         companion object {
             fun fromKey(raw: String?): ThemeStyleOption =
                 entries.firstOrNull { it.key.equals(raw, ignoreCase = true) } ?: CLASSIC
         }
     }
+
+    enum class CatMood {
+        HAPPY_GUARD,
+        NEED_PERMISSION,
+        ATTENTIVE_WARN,
+        SLEEPING_PAUSED
+    }
+
+    enum class MeowCatPose(val poseBadge: String) {
+        SLEEPING("zZ 呼噜打盹中"),
+        AWAKE_WALK("★ 巡逻散步喵"),
+        AWAKE_ROLL("★ 露肚卖萌喵"),
+        AWAKE_SIT("★ 端坐盯梢喵"),
+        AWAKE_STRETCH("★ 伸腰元气喵")
+    }
+
+    val AWAKE_CAT_POSES: List<MeowCatPose> = listOf(
+        MeowCatPose.AWAKE_WALK,
+        MeowCatPose.AWAKE_ROLL,
+        MeowCatPose.AWAKE_SIT,
+        MeowCatPose.AWAKE_STRETCH
+    )
+
+    data class MeowCatPresentation(
+        val mood: CatMood,
+        val pose: MeowCatPose,
+        val isAwake: Boolean,
+        val titleTag: String,
+        val speechText: String
+    )
+
+    data class EndfieldHudTelemetry(
+        val statusCode: String,
+        val syncPercent: Int,
+        val subLabel: String,
+        val isAlert: Boolean,
+        val isActive: Boolean
+    )
 
     enum class StatusTone { OK, WARN, PAUSED, ALERT }
 
@@ -451,6 +490,173 @@ object ConsoleFormatter {
             else -> "RUN"
         }
         return "$state │ %02dS".format(windowSec)
+    }
+
+    fun isCatAwakeReady(status: KeepAliveStatus, observeOnly: Boolean): Boolean =
+        status.state == KeepAliveState.RUNNING &&
+            !observeOnly &&
+            status.batteryExempt &&
+            !status.backgroundRestricted &&
+            status.notificationsVisible
+
+    fun pickRandomAwakePose(previous: MeowCatPose?, randomVal: Int): MeowCatPose {
+        val candidates = if (previous != null && previous in AWAKE_CAT_POSES) {
+            AWAKE_CAT_POSES.filter { it != previous }
+        } else {
+            AWAKE_CAT_POSES
+        }
+        val idx = Math.floorMod(randomVal, candidates.size)
+        return candidates[idx]
+    }
+
+    fun formatMeowCat(
+        status: KeepAliveStatus,
+        observeOnly: Boolean,
+        todaySkipped: Int,
+        preferredAwakePose: MeowCatPose = MeowCatPose.AWAKE_SIT
+    ): MeowCatPresentation {
+        if (isCatAwakeReady(status, observeOnly)) {
+            val awakePose = if (preferredAwakePose in AWAKE_CAT_POSES) {
+                preferredAwakePose
+            } else {
+                MeowCatPose.AWAKE_SIT
+            }
+            val speech = if (todaySkipped > 0) {
+                "喵！全部守护已就绪，今天已帮你拍飞 ${todaySkipped} 个开屏广告啦，摸摸我呀~"
+            } else {
+                when (awakePose) {
+                    MeowCatPose.AWAKE_WALK -> "喵~ 全部设置已就位，美短小猫正在全速巡逻，开屏广告一冒头就拍掉！"
+                    MeowCatPose.AWAKE_ROLL -> "喵呜~ 所有守护都已就位！小猫安心露肚皮打滚，广告交给我来拦~"
+                    MeowCatPose.AWAKE_STRETCH -> "哈欠——伸个大懒腰！全部设置已就位，精神满满守护每一次启动~"
+                    else -> "喵~ 美短小猫端坐就位，全部守护已开启，打开其他应用自动帮你点掉广告！"
+                }
+            }
+            return MeowCatPresentation(
+                mood = CatMood.HAPPY_GUARD,
+                pose = awakePose,
+                isAwake = true,
+                titleTag = awakePose.poseBadge,
+                speechText = speech
+            )
+        }
+
+        return when (status.state) {
+            KeepAliveState.NEEDS_ACCESSIBILITY -> MeowCatPresentation(
+                mood = CatMood.NEED_PERMISSION,
+                pose = MeowCatPose.SLEEPING,
+                isAwake = false,
+                titleTag = "zZ 等开无障碍喵",
+                speechText = "呼噜…还没开启无障碍权限，小猫先眯一会儿，点下方开启就能叫醒我哦~"
+            )
+
+            KeepAliveState.CONNECTING -> MeowCatPresentation(
+                mood = CatMood.ATTENTIVE_WARN,
+                pose = MeowCatPose.SLEEPING,
+                isAwake = false,
+                titleTag = "zZ 连接掉线打盹",
+                speechText = "呼噜…小猫刚才和系统失联困住啦，去无障碍里重新开关一次就能醒来~"
+            )
+
+            KeepAliveState.PAUSED -> MeowCatPresentation(
+                mood = CatMood.SLEEPING_PAUSED,
+                pose = MeowCatPose.SLEEPING,
+                isAwake = false,
+                titleTag = "zZ 午睡打盹中",
+                speechText = "呼噜噜…自动跳过已暂停，小猫先蜷起来睡一觉，需要时随时唤醒我~"
+            )
+
+            KeepAliveState.RUNNING -> when {
+                observeOnly -> MeowCatPresentation(
+                    mood = CatMood.ATTENTIVE_WARN,
+                    pose = MeowCatPose.SLEEPING,
+                    isAwake = false,
+                    titleTag = "zZ 演练小憩中",
+                    speechText = "呼噜…当前是“仅演练不点击”，关闭演练并备齐设置，小猫就立刻醒来干活~"
+                )
+
+                status.backgroundRestricted -> MeowCatPresentation(
+                    mood = CatMood.ATTENTIVE_WARN,
+                    pose = MeowCatPose.SLEEPING,
+                    isAwake = false,
+                    titleTag = "zZ 后台受限困倦",
+                    speechText = "呼噜…系统限制了后台活动，去「后台保活」放行全部设置，小猫就能元气醒来~"
+                )
+
+                !status.batteryExempt -> MeowCatPresentation(
+                    mood = CatMood.ATTENTIVE_WARN,
+                    pose = MeowCatPose.SLEEPING,
+                    isAwake = false,
+                    titleTag = "zZ 省电打盹中",
+                    speechText = "呼噜…还没设为电量无限制，补齐保活最后几步就能把小猫彻底叫醒哦~"
+                )
+
+                else -> MeowCatPresentation(
+                    mood = CatMood.ATTENTIVE_WARN,
+                    pose = MeowCatPose.SLEEPING,
+                    isAwake = false,
+                    titleTag = "zZ 等开守护通知",
+                    speechText = "呼噜…还差状态栏守护通知，去「后台保活」全部开启，小猫马上清醒守护你~"
+                )
+            }
+        }
+    }
+
+    fun formatEndfieldHud(
+        status: KeepAliveStatus,
+        observeOnly: Boolean
+    ): EndfieldHudTelemetry {
+        val keepAliveHealthy = status.batteryExempt && !status.backgroundRestricted && status.notificationsVisible
+        return when (status.state) {
+            KeepAliveState.NEEDS_ACCESSIBILITY -> EndfieldHudTelemetry(
+                statusCode = "OFFLINE",
+                syncPercent = 0,
+                subLabel = "A11Y REQUIRED",
+                isAlert = true,
+                isActive = false
+            )
+
+            KeepAliveState.CONNECTING -> EndfieldHudTelemetry(
+                statusCode = "RECONNECT",
+                syncPercent = 25,
+                subLabel = "LINK LOST",
+                isAlert = true,
+                isActive = false
+            )
+
+            KeepAliveState.PAUSED -> EndfieldHudTelemetry(
+                statusCode = "STANDBY",
+                syncPercent = 50,
+                subLabel = "PAUSED",
+                isAlert = false,
+                isActive = false
+            )
+
+            KeepAliveState.RUNNING -> when {
+                observeOnly -> EndfieldHudTelemetry(
+                    statusCode = "OBSERVE",
+                    syncPercent = 75,
+                    subLabel = "DRY-RUN",
+                    isAlert = false,
+                    isActive = true
+                )
+
+                !keepAliveHealthy -> EndfieldHudTelemetry(
+                    statusCode = "GUARD",
+                    syncPercent = 75,
+                    subLabel = "KEEP-ALIVE",
+                    isAlert = false,
+                    isActive = true
+                )
+
+                else -> EndfieldHudTelemetry(
+                    statusCode = "ONLINE",
+                    syncPercent = 100,
+                    subLabel = "LINK ACTIVE",
+                    isAlert = false,
+                    isActive = true
+                )
+            }
+        }
     }
 
     /**

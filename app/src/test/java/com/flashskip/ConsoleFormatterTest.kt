@@ -280,4 +280,129 @@ class ConsoleFormatterTest {
         assertEquals(efLight.onSignal, efLight.statusAlertFg)
         assertNotEquals(clLight.signal, efLight.signal)
     }
+
+    @Test
+    fun `meow theme palette, cat moods, and endfield HUD telemetry map accurately`() {
+        assertEquals(FlashTheme.ThemeStyle.MEOW, FlashTheme.ThemeStyle.fromKey("meow"))
+        assertEquals(ConsoleFormatter.ThemeStyleOption.MEOW, ConsoleFormatter.ThemeStyleOption.fromKey("MEOW"))
+
+        val meowLight = FlashTheme.paletteFor(FlashTheme.ThemeStyle.MEOW, dark = false)
+        val meowDark = FlashTheme.paletteFor(FlashTheme.ThemeStyle.MEOW, dark = true)
+        val clLight = FlashTheme.paletteFor(FlashTheme.ThemeStyle.CLASSIC, dark = false)
+
+        assertEquals(FlashTheme.ThemeStyle.MEOW, meowLight.style)
+        assertTrue(meowDark.isDark)
+        assertFalse(meowLight.isDark)
+        assertNotEquals(meowLight.signal, meowLight.onSignal)
+        assertNotEquals(meowDark.signal, meowDark.onSignal)
+        assertNotEquals(clLight.paper, meowLight.paper)
+        assertNotEquals(meowLight.paper, meowDark.paper)
+
+        val healthy = KeepAliveStatus(
+            masterEnabled = true,
+            accessibilityEnabled = true,
+            accessibilityConnected = true,
+            foregroundActive = true,
+            batteryExempt = true,
+            backgroundRestricted = false,
+            notificationsVisible = true
+        )
+
+        val catNeedPerm = ConsoleFormatter.formatMeowCat(healthy.copy(accessibilityEnabled = false), false, 0)
+        assertEquals(ConsoleFormatter.CatMood.NEED_PERMISSION, catNeedPerm.mood)
+        assertEquals(ConsoleFormatter.MeowCatPose.SLEEPING, catNeedPerm.pose)
+        assertFalse(catNeedPerm.isAwake)
+        assertTrue(catNeedPerm.speechText.contains("无障碍"))
+
+        val catConnecting = ConsoleFormatter.formatMeowCat(healthy.copy(accessibilityConnected = false), false, 0)
+        assertEquals(ConsoleFormatter.CatMood.ATTENTIVE_WARN, catConnecting.mood)
+        assertEquals(ConsoleFormatter.MeowCatPose.SLEEPING, catConnecting.pose)
+        assertFalse(catConnecting.isAwake)
+
+        val catPaused = ConsoleFormatter.formatMeowCat(healthy.copy(masterEnabled = false), false, 0)
+        assertEquals(ConsoleFormatter.CatMood.SLEEPING_PAUSED, catPaused.mood)
+        assertEquals(ConsoleFormatter.MeowCatPose.SLEEPING, catPaused.pose)
+        assertFalse(catPaused.isAwake)
+
+        val catObserve = ConsoleFormatter.formatMeowCat(healthy, observeOnly = true, todaySkipped = 3)
+        assertEquals(ConsoleFormatter.CatMood.ATTENTIVE_WARN, catObserve.mood)
+        assertEquals(ConsoleFormatter.MeowCatPose.SLEEPING, catObserve.pose)
+        assertFalse(catObserve.isAwake)
+
+        val catNoBattery = ConsoleFormatter.formatMeowCat(healthy.copy(batteryExempt = false), false, 0)
+        assertEquals(ConsoleFormatter.MeowCatPose.SLEEPING, catNoBattery.pose)
+        assertFalse(catNoBattery.isAwake)
+
+        val catBgRestricted = ConsoleFormatter.formatMeowCat(healthy.copy(backgroundRestricted = true), false, 0)
+        assertEquals(ConsoleFormatter.MeowCatPose.SLEEPING, catBgRestricted.pose)
+        assertFalse(catBgRestricted.isAwake)
+
+        val catNoNotif = ConsoleFormatter.formatMeowCat(healthy.copy(notificationsVisible = false), false, 0)
+        assertEquals(ConsoleFormatter.MeowCatPose.SLEEPING, catNoNotif.pose)
+        assertFalse(catNoNotif.isAwake)
+
+        assertTrue(ConsoleFormatter.isCatAwakeReady(healthy, observeOnly = false))
+        assertFalse(ConsoleFormatter.isCatAwakeReady(healthy.copy(batteryExempt = false), observeOnly = false))
+        assertFalse(ConsoleFormatter.isCatAwakeReady(healthy, observeOnly = true))
+
+        val pickedAll = (0 until 4).map { ConsoleFormatter.pickRandomAwakePose(null, it) }.toSet()
+        assertEquals(4, pickedAll.size)
+        assertFalse(pickedAll.contains(ConsoleFormatter.MeowCatPose.SLEEPING))
+
+        for (prev in ConsoleFormatter.AWAKE_CAT_POSES) {
+            for (r in 0..5) {
+                val next = ConsoleFormatter.pickRandomAwakePose(prev, r)
+                assertNotEquals(prev, next)
+                assertTrue(next in ConsoleFormatter.AWAKE_CAT_POSES)
+            }
+        }
+
+        val catHappyZero = ConsoleFormatter.formatMeowCat(
+            healthy,
+            observeOnly = false,
+            todaySkipped = 0,
+            preferredAwakePose = ConsoleFormatter.MeowCatPose.AWAKE_WALK
+        )
+        assertEquals(ConsoleFormatter.CatMood.HAPPY_GUARD, catHappyZero.mood)
+        assertEquals(ConsoleFormatter.MeowCatPose.AWAKE_WALK, catHappyZero.pose)
+        assertTrue(catHappyZero.isAwake)
+        assertTrue(catHappyZero.speechText.contains("就位"))
+
+        val catHappyWithCount = ConsoleFormatter.formatMeowCat(
+            healthy,
+            observeOnly = false,
+            todaySkipped = 7,
+            preferredAwakePose = ConsoleFormatter.MeowCatPose.AWAKE_ROLL
+        )
+        assertEquals(ConsoleFormatter.CatMood.HAPPY_GUARD, catHappyWithCount.mood)
+        assertEquals(ConsoleFormatter.MeowCatPose.AWAKE_ROLL, catHappyWithCount.pose)
+        assertTrue(catHappyWithCount.isAwake)
+        assertTrue(catHappyWithCount.speechText.contains("7"))
+
+        val hudOnline = ConsoleFormatter.formatEndfieldHud(healthy, observeOnly = false)
+        assertEquals("ONLINE", hudOnline.statusCode)
+        assertEquals(100, hudOnline.syncPercent)
+        assertTrue(hudOnline.isActive)
+        assertFalse(hudOnline.isAlert)
+
+        val hudGuard = ConsoleFormatter.formatEndfieldHud(healthy.copy(batteryExempt = false), observeOnly = false)
+        assertEquals("GUARD", hudGuard.statusCode)
+        assertEquals(75, hudGuard.syncPercent)
+
+        val hudObserve = ConsoleFormatter.formatEndfieldHud(healthy, observeOnly = true)
+        assertEquals("OBSERVE", hudObserve.statusCode)
+
+        val hudPaused = ConsoleFormatter.formatEndfieldHud(healthy.copy(masterEnabled = false), observeOnly = false)
+        assertEquals("STANDBY", hudPaused.statusCode)
+        assertFalse(hudPaused.isActive)
+
+        val hudReconnect = ConsoleFormatter.formatEndfieldHud(healthy.copy(accessibilityConnected = false), observeOnly = false)
+        assertEquals("RECONNECT", hudReconnect.statusCode)
+        assertTrue(hudReconnect.isAlert)
+
+        val hudOffline = ConsoleFormatter.formatEndfieldHud(healthy.copy(accessibilityEnabled = false), observeOnly = false)
+        assertEquals("OFFLINE", hudOffline.statusCode)
+        assertEquals(0, hudOffline.syncPercent)
+        assertTrue(hudOffline.isAlert)
+    }
 }

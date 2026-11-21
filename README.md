@@ -1,18 +1,23 @@
 # FlashSkip（闪跳）
 
-[![Version](https://img.shields.io/badge/Version-0.8.0-161616.svg)](#)
+[![Version](https://img.shields.io/badge/Version-1.0.0-161616.svg)](#)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.0.21-7F52FF.svg)](https://kotlinlang.org)
 [![Android](https://img.shields.io/badge/Android-8.0%2B%20(API%2026--34)-3DDC84.svg)](https://developer.android.com)
 [![Network](https://img.shields.io/badge/Network-Zero%20Permission-0A7EA4.svg)](#隐私与安全设计)
 
 **FlashSkip** 是一款基于 Android 无障碍服务（`AccessibilityService`）的事件驱动开屏广告自动跳过工具——**无需 Root、零网络权限、纯本地运行**。通过纯 Kotlin 编写的规则与状态机引擎，在极短延迟内识别并点击“跳过”按钮，同时内置多层防误触机制，防止误点全屏广告落地页或正常业务按钮。
 
-> **v0.8.0 核心升级**：新增热重进（Hot Resume）有界延迟补查与未知焦点窗口安全识别、消费级「首页 / 后台保活 / 更多设置」三分区 UI 与双风格主题（「日常简约」/「终末地 Endfield」）、跳过成功系统轻提示、多品牌后台保活直达引导，以及默认关闭的可选 Shizuku（`UiAutomation`）实验跳过引擎。
+> **v1.0.0 正式版**：新增 **三套可随时切换的界面主题（「日常简约 / 终末地 Endfield / 软萌猫咪」）**，强化终末地全屏等高线与二次元战术 HUD、搭载参考美短加白插画多姿态互动猫猫与磨砂大猫头背景；底层继承热重进（Hot Resume）有界延迟补查、未知焦点窗口安全识别、多品牌后台保活直达引导、跳过成功轻提示与可选 Shizuku（`UiAutomation`）双引擎。
 
 ---
 
-## 核心特性（v0.8.0）
+## 核心特性（v1.0.0）
 
+- **三套前端视觉风格 & 全功能浅/深色切换**：
+  - **日常简约（Classic）**：高可读性圆润白/夜卡布局，聚焦状态总览、主开关与保活进度条；
+  - **终末地（Endfield）**：全屏程序化多层有机等高线、`+240M` / `SEC-04` / `FS//08` 十字准星与右侧标尺、黑黄警示斜纹 + 实时脉冲波形 + 条形码 `[ONLINE] SYNC` 战术 HUD、`Saira` 字体与 45° 切角面板；
+  - **软萌猫咪（海盐奶蓝 × 银虎斑美短加白，零粉色）**：内置行走巡逻、翻肚撒娇、正坐发呆、伸懒腰 4 种苏醒姿态与蜷睡 `Zzz` 姿态；所有必要设置就绪时每次进入首页随机切换苏醒姿态，未完全开启时自动进入午睡状态；首页下半屏采用斜角淡化大猫猫头背景搭配 ~72% 磨砂卡片，保活/设置分页亦配备专属猫元素手账底纹与猫爪就绪度条；
+  - 「更多设置」首屏置顶「界面外观」开关，三套风格均支持 **跟随系统 / 浅色 / 深色**。
 - **双引擎架构（无障碍为主，Shizuku 可选）**：
   - 默认仅使用系统 `AccessibilityService` 独立运行，**不依赖、不绑定任何外部软件**；
   - 可在「更多设置」按需开启 **Shizuku（`UiAutomation`）实验跳过模式**（默认关闭），两套引擎共用同一套包过滤、匹配规则、防误触与关闭证据校验，Shizuku 断连后自动回退交还控制权给系统无障碍服务。
@@ -22,13 +27,37 @@
 - **严格关闭确认与假成功升级**：
   - 区分 `VERIFIED_CLOSED`（确认关闭）、`STILL_PRESENT`（广告仍在）、`NAVIGATED`（同包导航跳转）与 `UNOBSERVED`（未观测），关闭前刷新原窗口候选树防止缓存掩盖；
   - 遇到广告 SDK 对 `ACTION_CLICK` 返回“假成功”时自动升级手势点击；首次手势未提交且控件位置微移时，支持在唯一身份与安全位置校验下重查原目标一次。
-- **消费级三分区界面 & 双风格主题**：
-  - 面向日常使用重构为 **「首页 / 后台保活 / 更多设置」**（适配手机底栏、宽屏 `w600dp` 侧栏及放大字号）；
-  - 内置 **「日常简约」** 与 **「终末地（Endfield）」** 双风格（支持跟随系统 / 浅色 / 深色）；
-  - 引擎确认跳过后可弹出静音、无焦点、零悬浮窗权限的系统轻提示 `FlashSkip 已跳过广告`（支持独立开关与 `1800 ms` 防抖）。
-- **后台保活与多品牌设置引导**：
-  - 加固深度休眠（Doze）与亮屏/解锁唤醒恢复，支持一键暂停保护并撤下常驻通知；
-  - 内置荣耀、华为、小米、OPPO、vivo、三星、魅族后台自启/保护页直达入口与分步手动引导，独立保留标准电池白名单入口。
+- **轻量跳过提示与多品牌后台保活引导**：
+  - 引擎确认跳过后可弹出静音、无焦点、零悬浮窗权限的系统轻提示 `FlashSkip 已跳过广告`（支持独立开关与 `1800 ms` 防抖）；
+  - 加固深度休眠（Doze）与亮屏/解锁唤醒恢复，内置荣耀、华为、小米、OPPO、vivo、三星、魅族后台自启/保护页直达入口与分步手动引导，独立保留标准电池白名单入口。
+
+---
+
+## 界面预览（三套主题 · 浅/深双色实机截图）
+
+> 以下界面截图全部实拍自真机并已裁剪系统状态栏。
+
+### 1. 日常简约（Classic）
+
+| 浅色首页 | 深色首页 |
+| :---: | :---: |
+| <img src="docs/media/ui-classic-light.png" width="260" alt="日常简约浅色首页" /> | <img src="docs/media/ui-classic-dark.png" width="260" alt="日常简约深色首页" /> |
+
+### 2. 终末地（Endfield · 全屏等高线与战术 HUD）
+
+| 浅色控制台 | 深色控制台 |
+| :---: | :---: |
+| <img src="docs/media/ui-endfield-light.png" width="260" alt="终末地浅色控制台" /> | <img src="docs/media/ui-endfield-dark.png" width="260" alt="终末地深色控制台" /> |
+
+### 3. 软萌猫咪（海盐奶蓝 × 银虎斑美短加白）
+
+| 浅色苏醒态（斜角大猫头背景 + 随机姿态） | 深色苏醒态（星空牛仔蓝 + 随机姿态） |
+| :---: | :---: |
+| <img src="docs/media/ui-meow-light-awake.png" width="260" alt="软萌猫咪浅色苏醒态" /> | <img src="docs/media/ui-meow-dark-awake.png" width="260" alt="软萌猫咪深色苏醒态" /> |
+
+| 未完全开启/暂停态（蜷睡 `Zzz` 午睡猫） | 更多设置（外观置顶 + 玩具手账底纹） |
+| :---: | :---: |
+| <img src="docs/media/ui-meow-light-sleep.png" width="260" alt="软萌猫咪未开启蜷睡态" /> | <img src="docs/media/ui-meow-more.png" width="260" alt="软萌猫咪更多设置页" /> |
 
 ---
 
@@ -79,7 +108,7 @@
 
 ### 自动化测试与真机回归结果
 
-- **JVM 单元测试**：`66 / 66` 项全部通过（`:core` 49 项 + `:app` 17 项，0 失败 / 0 跳过）。
+- **JVM 单元测试**：`67 / 67` 项全部通过（`:core` 49 项 + `:app` 18 项，0 失败 / 0 跳过）。
 - **内置对抗靶场（[TestSplashActivity.kt](app/src/main/java/com/flashskip/TestSplashActivity.kt)）**：
   - 原 8 项核心对抗回归（5 正向跳过 + 3 负向防误触 `neg_guide` / `neg_redpacket` / `neg_center`）在荣耀 API 36 双引擎下全数通过（`PASS = 8 / 8, FAIL = 0`）；
   - 扩展靶场覆盖 `warm_resume`（热重进）、跨窗口关闭与同包导流（4 正例 `VERIFIED_CLOSED` + 2 导流 `NAVIGATED`，6/6 通过），以及 `marker_replaced` / `marker_late` / `retry_replaced` 等反例边界。
@@ -111,7 +140,7 @@ app/ (Android 服务、实验双引擎、保活与界面层)
  ├── experimental/                 可选 Shizuku 实验引擎（ExperimentalSkip / UiAutomationRunner / SkipActionGate）
  ├── keepalive/                    PermissionHelper / KeepAliveStatus / BackgroundSettings 多品牌保活检测与直达
  ├── data/SkipLog.kt & StatsStore.kt     双文件轮转日志、本地 P50/P95 延迟统计与主题/开关持久化
- ├── ui/                           FlashTheme（双风格）、SkipSuccessToast、EfCutDrawable/EfButton/EfViews 等
+ ├── ui/                           FlashTheme（三风格）、EndfieldDecorViews、MeowDecorViews、SkipSuccessToast 等
  └── MainActivity.kt & TestSplashActivity.kt  三分区用户界面、20+ 场景分组靶场与 launch_scenario 自动化入口
 ```
 

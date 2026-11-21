@@ -19,6 +19,7 @@ import android.os.Looper
 import android.os.SystemClock
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
@@ -52,8 +53,15 @@ import com.flashskip.ui.EfCutDrawable
 import com.flashskip.ui.EfDialogs
 import com.flashskip.ui.EfHatchView
 import com.flashskip.ui.EfSegmentBarView
+import com.flashskip.ui.EfTechHudStripView
 import com.flashskip.ui.EfTypeface
+import com.flashskip.ui.EndfieldBackdropView
 import com.flashskip.ui.FlashTheme
+import com.flashskip.ui.MeowBackdropView
+import com.flashskip.ui.MeowCatMascotView
+import com.flashskip.ui.MeowDividerDrawable
+import com.flashskip.ui.MeowEmptyCardDrawable
+import com.flashskip.ui.MeowPanelDrawable
 
 class MainActivity : AppCompatActivity() {
 
@@ -61,12 +69,14 @@ class MainActivity : AppCompatActivity() {
     private lateinit var statsStore: StatsStore
 
     private lateinit var rootContainer: FrameLayout
+    private lateinit var endfieldBackdrop: EndfieldBackdropView
+    private lateinit var meowBackdrop: MeowBackdropView
     private lateinit var ivContourTopRight: ImageView
     private lateinit var ivContourBottomLeft: ImageView
     private lateinit var mainScroll: ScrollView
     private lateinit var commandBar: View
-    private lateinit var ivBrandSeal: View
-    private lateinit var vEndfieldMark: View
+    private lateinit var ivBrandSeal: ImageView
+    private lateinit var vEndfieldMark: ImageView
     private lateinit var tvCommandBrand: TextView
     private lateinit var tvCommandVer: TextView
     private lateinit var tvCmdStatus: TextView
@@ -79,11 +89,18 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tabNavBar: View
     private lateinit var navDivider: View
 
-    // Endfield Header / Eyebrow Views
+    // Endfield Header / Eyebrow Views & Meow Mascot Hero
     private lateinit var efHomeDisplayHeader: View
     private lateinit var efHomeEyebrowTop: TextView
     private lateinit var efHomeWordmark: TextView
+    private lateinit var efHomeUnitBadge: TextView
     private lateinit var efHomeSubheadline: TextView
+    private lateinit var efHomeHudStrip: EfTechHudStripView
+    private lateinit var meowHomeHeroHeader: View
+    private lateinit var meowCatMascot: MeowCatMascotView
+    private lateinit var tvMeowMoodTag: TextView
+    private lateinit var tvMeowSpeech: TextView
+    private lateinit var tvMeowPetHint: TextView
     private lateinit var efEyebrowHero: TextView
     private lateinit var efEyebrowControls: TextView
     private lateinit var efEyebrowHomeKa: TextView
@@ -200,6 +217,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var segStyle: LinearLayout
     private lateinit var segStyleClassic: TextView
     private lateinit var segStyleEndfield: TextView
+    private lateinit var segStyleMeow: TextView
     private lateinit var tvStyleActiveDesc: TextView
     private lateinit var tvThemeModeLabel: TextView
     private lateinit var segTheme: LinearLayout
@@ -264,6 +282,16 @@ class MainActivity : AppCompatActivity() {
     private var currentPrimaryAction = ConsoleFormatter.HomePrimaryAction.OPEN_ACCESSIBILITY
     private var lastRenderedLogVersion = -1
     private var lastRenderedExclusions: Set<String> = emptySet()
+    private var currentAwakeCatPose = ConsoleFormatter.pickRandomAwakePose(null, kotlin.random.Random.nextInt())
+    private var isCatAwakeNow = false
+    private var skipFirstStartRandomize = false
+
+    private fun randomizeAwakeCatPose() {
+        currentAwakeCatPose = ConsoleFormatter.pickRandomAwakePose(
+            currentAwakeCatPose,
+            kotlin.random.Random.nextInt()
+        )
+    }
 
     companion object {
         private const val KEY_ACTIVE_TAB = "active_tab"
@@ -296,6 +324,7 @@ class MainActivity : AppCompatActivity() {
         activeTab = savedInstanceState?.getInt(KEY_ACTIVE_TAB, 0)?.coerceIn(0, 2) ?: 0
         advancedToolsExpanded = savedInstanceState?.getBoolean(KEY_ADV_EXPANDED, false) ?: false
         testLabListExpanded = savedInstanceState?.getBoolean(KEY_LAB_EXPANDED, false) ?: false
+        skipFirstStartRandomize = true
 
         bindViews()
         applyEdgeToEdgeInsets()
@@ -315,6 +344,15 @@ class MainActivity : AppCompatActivity() {
         outState.putBoolean(KEY_ADV_EXPANDED, advancedToolsExpanded)
         outState.putBoolean(KEY_LAB_EXPANDED, testLabListExpanded)
         super.onSaveInstanceState(outState)
+    }
+
+    override fun onStart() {
+        super.onStart()
+        if (skipFirstStartRandomize) {
+            skipFirstStartRandomize = false
+        } else if (activeTab == 0) {
+            randomizeAwakeCatPose()
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -392,6 +430,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun bindViews() {
         rootContainer = findViewById(R.id.rootContainer)
+        endfieldBackdrop = findViewById(R.id.endfieldBackdrop)
+        meowBackdrop = findViewById(R.id.meowBackdrop)
         ivContourTopRight = findViewById(R.id.ivContourTopRight)
         ivContourBottomLeft = findViewById(R.id.ivContourBottomLeft)
         mainScroll = findViewById(R.id.mainScroll)
@@ -413,7 +453,14 @@ class MainActivity : AppCompatActivity() {
         efHomeDisplayHeader = findViewById(R.id.efHomeDisplayHeader)
         efHomeEyebrowTop = findViewById(R.id.efHomeEyebrowTop)
         efHomeWordmark = findViewById(R.id.efHomeWordmark)
+        efHomeUnitBadge = findViewById(R.id.efHomeUnitBadge)
         efHomeSubheadline = findViewById(R.id.efHomeSubheadline)
+        efHomeHudStrip = findViewById(R.id.efHomeHudStrip)
+        meowHomeHeroHeader = findViewById(R.id.meowHomeHeroHeader)
+        meowCatMascot = findViewById(R.id.meowCatMascot)
+        tvMeowMoodTag = findViewById(R.id.tvMeowMoodTag)
+        tvMeowSpeech = findViewById(R.id.tvMeowSpeech)
+        tvMeowPetHint = findViewById(R.id.tvMeowPetHint)
         efEyebrowHero = findViewById(R.id.efEyebrowHero)
         efEyebrowControls = findViewById(R.id.efEyebrowControls)
         efEyebrowHomeKa = findViewById(R.id.efEyebrowHomeKa)
@@ -527,6 +574,7 @@ class MainActivity : AppCompatActivity() {
         segStyle = findViewById(R.id.segStyle)
         segStyleClassic = findViewById(R.id.segStyleClassic)
         segStyleEndfield = findViewById(R.id.segStyleEndfield)
+        segStyleMeow = findViewById(R.id.segStyleMeow)
         tvStyleActiveDesc = findViewById(R.id.tvStyleActiveDesc)
         tvThemeModeLabel = findViewById(R.id.tvThemeModeLabel)
         segTheme = findViewById(R.id.segTheme)
@@ -653,25 +701,29 @@ class MainActivity : AppCompatActivity() {
 
     private fun applyVisualTheme() {
         val endfield = FlashTheme.isEndfield(this)
+        val meow = FlashTheme.isMeow(this)
         val p = FlashTheme.palette(this)
         val density = resources.displayMetrics.density
         val hairlinePx = (1f * density).toInt().coerceAtLeast(1)
 
         rootContainer.setBackgroundColor(p.paper)
 
-        // Endfield open contours backdrop (9% ink alpha in opposite corners)
-        val contourTint = Color.argb((255 * 0.09f).toInt(), Color.red(p.ink), Color.green(p.ink), Color.blue(p.ink))
-        listOf(ivContourTopRight, ivContourBottomLeft).forEach { iv ->
-            iv.visibility = if (endfield) View.VISIBLE else View.GONE
-            ImageViewCompat.setImageTintList(iv, ColorStateList.valueOf(contourTint))
-        }
+        // Full-screen theme backdrops (Endfield topographic contours / Meow cute sketchbook)
+        endfieldBackdrop.visibility = if (endfield) View.VISIBLE else View.GONE
+        meowBackdrop.visibility = if (meow) View.VISIBLE else View.GONE
+        ivContourTopRight.visibility = View.GONE
+        ivContourBottomLeft.visibility = View.GONE
 
         // Top Command Bar / Header
         commandBar.setBackgroundColor(p.commandBar)
         ivBrandSeal.visibility = if (endfield) View.GONE else View.VISIBLE
+        ivBrandSeal.setImageResource(if (meow) R.drawable.ic_meow_brand_cat else R.drawable.ic_ef_flash_seal)
         vEndfieldMark.visibility = if (endfield) View.VISIBLE else View.GONE
-        vEndfieldMark.setBackgroundColor(p.signal)
-        tvCommandBrand.text = if (endfield) "FLASHSKIP" else getString(R.string.app_display_name)
+        tvCommandBrand.text = when {
+            endfield -> "FLASHSKIP"
+            meow -> "闪跳 · 喵护"
+            else -> getString(R.string.app_display_name)
+        }
         tvCommandBrand.setTextColor(p.commandBarInk)
         if (endfield) {
             EfTypeface.applyWordmark(tvCommandBrand)
@@ -682,15 +734,15 @@ class MainActivity : AppCompatActivity() {
         } else {
             tvCommandBrand.typeface = Typeface.DEFAULT_BOLD
             tvCommandBrand.letterSpacing = 0f
-            tvCommandVer.text = "不联网 · 本地运行"
+            tvCommandVer.text = if (meow) "喵~ 不联网 · 本地守护" else "不联网 · 本地运行"
             tvCommandVer.typeface = Typeface.DEFAULT
             tvCommandVer.isAllCaps = false
         }
         tvCommandVer.setTextColor(p.commandBarMuted)
 
-        headerHairline.visibility = if (endfield) View.GONE else View.VISIBLE
+        headerHairline.visibility = if (endfield || meow) View.GONE else View.VISIBLE
         headerHairline.setBackgroundColor(p.rule)
-        triStripContainer.visibility = if (endfield) View.VISIBLE else View.GONE
+        triStripContainer.visibility = if (endfield || meow) View.VISIBLE else View.GONE
         triStripA.setBackgroundColor(p.triA)
         triStripB.setBackgroundColor(p.triB)
         triStripC.setBackgroundColor(p.triC)
@@ -705,13 +757,50 @@ class MainActivity : AppCompatActivity() {
             cornerRadiusPx = if (endfield) 0f else 999f * density,
             cutBottomRightPx = if (endfield) 7f * density else 0f
         )
-        if (endfield) EfTypeface.applyField(btnThemeQuick, bold = true)
+        if (endfield) {
+            EfTypeface.applyField(btnThemeQuick, bold = true)
+        } else {
+            btnThemeQuick.typeface = Typeface.DEFAULT_BOLD
+        }
 
         // Endfield hero & // eyebrows
         efHomeDisplayHeader.visibility = if (endfield) View.VISIBLE else View.GONE
         efHomeEyebrowTop.setTextColor(p.ink2)
         efHomeWordmark.setTextColor(p.ink)
         efHomeSubheadline.setTextColor(p.ink)
+        if (endfield) {
+            efHomeUnitBadge.background = EfCutDrawable.build(
+                fillColor = p.signal,
+                cutBottomRightPx = 6f * density,
+                useCutCorners = true
+            )
+            efHomeUnitBadge.setTextColor(p.onSignal)
+            EfTypeface.applyField(efHomeUnitBadge, bold = true)
+        }
+
+        // Meow Chibi-Cat Hero Card
+        meowHomeHeroHeader.visibility = if (meow) View.VISIBLE else View.GONE
+        if (meow) {
+            meowHomeHeroHeader.background = MeowPanelDrawable(
+                fillColor = p.panel,
+                strokeColor = p.rule,
+                lipColor = p.rule,
+                pawColor = p.signal,
+                cornerRadiusPx = 22f * density,
+                strokeWidthPx = (1.5f * density).coerceAtLeast(1f),
+                density = density,
+                showCatEars = true,
+                isDark = p.isDark
+            )
+            tvMeowMoodTag.background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = 999f * density
+                setColor(p.tagBg)
+            }
+            tvMeowMoodTag.setTextColor(p.tagFg)
+            tvMeowSpeech.setTextColor(p.ink)
+            tvMeowPetHint.setTextColor(p.ink2)
+        }
 
         val eyebrows = listOf(
             efEyebrowHero, efEyebrowControls, efEyebrowHomeKa, efEyebrowStats,
@@ -723,36 +812,59 @@ class MainActivity : AppCompatActivity() {
             tv.setTextColor(p.ink2)
         }
 
-        // Dashboard Cards / Panels (Endfield: 0dp sharp top-tab + 26dp bottom-right cut, 1dp rule)
+        // Dashboard Cards / Panels
         val mainPanels = listOf(
             serviceStatusPanel, cardHomeControls, homeKeepAliveCard, telemetryPanel,
             cardKaChecklist, keepAliveGuideCard, sectionExclusions, cardAppearance,
             cardPrivacySafety, cardExperimentalSkip, advancedToolsCard
         )
         mainPanels.forEach { panel ->
-            if (endfield) {
-                panel.background = EfCutDrawable.buildEndfieldPanel(
+            when {
+                endfield -> panel.background = EfCutDrawable.buildEndfieldPanel(
                     fillColor = p.panel,
                     ruleColor = p.rule,
                     tabColor = p.ink,
                     strokeWidthPx = hairlinePx.toFloat(),
                     cutBottomRightPx = 26f * density,
                     tabWidthPx = (56f * density).toInt(),
-                    tabHeightPx = (5f * density).toInt()
+                    tabHeightPx = (5f * density).toInt(),
+                    signalColor = p.signal,
+                    isDark = p.isDark,
+                    density = density
                 )
-            } else {
-                panel.setBackgroundResource(R.drawable.ef_panel_bg)
+                meow -> panel.background = MeowPanelDrawable(
+                    fillColor = p.panel,
+                    strokeColor = p.rule,
+                    lipColor = p.rule,
+                    pawColor = p.signal,
+                    cornerRadiusPx = 22f * density,
+                    strokeWidthPx = (1.5f * density).coerceAtLeast(1f),
+                    density = density,
+                    showCatEars = false,
+                    isDark = p.isDark
+                )
+                else -> panel.setBackgroundResource(R.drawable.ef_panel_bg)
             }
         }
-        // Keep top-edge padding clear of the 5dp dark tab & bottom-right padding clear of 26dp cut
-        if (endfield) {
-            val pad18 = (18f * density).toInt()
-            val padTop22 = (22f * density).toInt()
-            val padBottom24 = (24f * density).toInt()
-            listOf(
-                serviceStatusPanel, homeKeepAliveCard, telemetryPanel, cardKaChecklist,
-                keepAliveGuideCard, sectionExclusions, cardAppearance, cardPrivacySafety, cardExperimentalSkip
-            ).forEach { it.setPadding(pad18, padTop22, pad18, padBottom24) }
+        // Keep padding clear of top-left ink tab / peeking cat ears & bottom-right chamfer / candy lip
+        val pad18 = (18f * density).toInt()
+        val paddedPanels = listOf(
+            serviceStatusPanel, homeKeepAliveCard, telemetryPanel, cardKaChecklist,
+            keepAliveGuideCard, sectionExclusions, cardAppearance, cardPrivacySafety, cardExperimentalSkip
+        )
+        when {
+            endfield -> {
+                val padTop22 = (22f * density).toInt()
+                val padBottom24 = (24f * density).toInt()
+                paddedPanels.forEach { it.setPadding(pad18, padTop22, pad18, padBottom24) }
+            }
+            meow -> {
+                val padBottom21 = (21f * density).toInt()
+                paddedPanels.forEach { it.setPadding(pad18, pad18, pad18, padBottom21) }
+            }
+            else -> {
+                paddedPanels.forEach { it.setPadding(pad18, pad18, pad18, pad18) }
+            }
         }
 
         // Primary & Secondary text colors across layouts
@@ -774,28 +886,43 @@ class MainActivity : AppCompatActivity() {
             tvSafetyGuide, tvAdvancedSub, tvStatSampleCount, tvStats, tvLogMeta, tvExperimentalSkipStatus
         ).forEach { it.setTextColor(p.ink2) }
 
-        // Hairline rules
-        listOf(ctrlDivider, kaDivider1, kaDivider2, kaDivider3, exclDivider)
-            .forEach { it.setBackgroundColor(p.rule) }
-
-        // Notice & feedback banners (Endfield = 28dp yellow ! square block, Classic = 4dp vertical bar)
-        applyBannerTheme(noticeActionBanner, vNoticeAccent, tvNoticeFlag, tvNextStepHint, p, endfield, density, hairlinePx)
-        applyBannerTheme(kaJumpFeedbackBanner, vKaFeedbackBar, tvKaFeedbackFlag, tvKaJumpFeedback, p, endfield, density, hairlinePx)
-
-        // Subtle inner tiles (0dp in Endfield, rounded in Classic)
-        val innerTiles = listOf(statTodayTile, statTotalTile, telemetryDataGroup, logContainerBox)
-        innerTiles.forEach { v ->
-            if (endfield) {
-                v.background = EfCutDrawable.buildSquareBox(p.panelSubtle, p.rule, hairlinePx)
+        // Hairline / cat-whisker dividers
+        listOf(ctrlDivider, kaDivider1, kaDivider2, kaDivider3, exclDivider).forEach { div ->
+            val lp = div.layoutParams
+            if (meow) {
+                lp.height = (12f * density).toInt().coerceAtLeast(1)
+                div.layoutParams = lp
+                div.background = MeowDividerDrawable(p.rule, p.signal, density)
             } else {
-                v.setBackgroundResource(R.drawable.fs_tile_bg)
+                lp.height = hairlinePx
+                div.layoutParams = lp
+                div.setBackgroundColor(p.rule)
             }
         }
 
-        // Empty state 45-degree hatch boxes
-        applyEmptyHatchTheme(emptyStatsBox, hatchEmptyStats, tvEmptyStatsText, p, endfield, density)
-        applyEmptyHatchTheme(emptyExclusionsBox, hatchEmptyExclusions, tvEmptyExclusionsText, p, endfield, density)
-        applyEmptyHatchTheme(emptyLogBox, hatchEmptyLog, tvEmptyLogText, p, endfield, density)
+        // Notice & feedback banners
+        applyBannerTheme(noticeActionBanner, vNoticeAccent, tvNoticeFlag, tvNextStepHint, p, endfield, meow, density, hairlinePx)
+        applyBannerTheme(kaJumpFeedbackBanner, vKaFeedbackBar, tvKaFeedbackFlag, tvKaJumpFeedback, p, endfield, meow, density, hairlinePx)
+
+        // Subtle inner tiles
+        val innerTiles = listOf(statTodayTile, statTotalTile, telemetryDataGroup, logContainerBox)
+        innerTiles.forEach { v ->
+            when {
+                endfield -> v.background = EfCutDrawable.buildSquareBox(p.panelSubtle, p.rule, hairlinePx)
+                meow -> v.background = GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE
+                    cornerRadius = 16f * density
+                    setColor(p.panelSubtle)
+                    setStroke(hairlinePx, p.rule)
+                }
+                else -> v.setBackgroundResource(R.drawable.fs_tile_bg)
+            }
+        }
+
+        // Empty state boxes
+        applyEmptyHatchTheme(emptyStatsBox, hatchEmptyStats, tvEmptyStatsText, p, endfield, meow, density)
+        applyEmptyHatchTheme(emptyExclusionsBox, hatchEmptyExclusions, tvEmptyExclusionsText, p, endfield, meow, density)
+        applyEmptyHatchTheme(emptyLogBox, hatchEmptyLog, tvEmptyLogText, p, endfield, meow, density)
 
         // Contrast-safe action links (NEVER yellow text on light paper!)
         val linkColor = p.linkColor
@@ -811,20 +938,33 @@ class MainActivity : AppCompatActivity() {
         // Switches & SeekBar
         listOf(swMaster, swSkipToast, swExperimentalSkip, swObserve, swDiag).forEach { sw ->
             sw.setTextColor(p.ink)
-            if (endfield) {
-                sw.trackDrawable = FlashTheme.buildEndfieldSwitchTrack(this, p)
-                sw.thumbDrawable = FlashTheme.buildEndfieldSwitchThumb(this, p)
-            } else {
-                sw.setTrackResource(R.drawable.ef_switch_track)
-                sw.setThumbResource(R.drawable.ef_switch_thumb)
+            when {
+                endfield -> {
+                    sw.trackDrawable = FlashTheme.buildEndfieldSwitchTrack(this, p)
+                    sw.thumbDrawable = FlashTheme.buildEndfieldSwitchThumb(this, p)
+                }
+                meow -> {
+                    sw.trackDrawable = FlashTheme.buildMeowSwitchTrack(this, p)
+                    sw.thumbDrawable = FlashTheme.buildMeowSwitchThumb(this, p)
+                }
+                else -> {
+                    sw.setTrackResource(R.drawable.ef_switch_track)
+                    sw.setThumbResource(R.drawable.ef_switch_thumb)
+                }
             }
         }
-        if (endfield) {
-            sbWindow.progressDrawable = FlashTheme.buildEndfieldSeekBarProgress(this, p)
-            sbWindow.thumb = FlashTheme.buildEndfieldSeekBarThumb(this, p)
+        when {
+            endfield -> {
+                sbWindow.progressDrawable = FlashTheme.buildEndfieldSeekBarProgress(this, p)
+                sbWindow.thumb = FlashTheme.buildEndfieldSeekBarThumb(this, p)
+            }
+            meow -> {
+                sbWindow.progressDrawable = FlashTheme.buildMeowSeekBarProgress(this, p)
+                sbWindow.thumb = FlashTheme.buildMeowSeekBarThumb(this, p)
+            }
         }
 
-        // Refresh all EfButtons to adopt cut corners / rounded corners & theme colors
+        // Refresh all EfButtons to adopt cut corners / candy rounded / classic styles
         refreshEfButtonsInTree(rootContainer)
     }
 
@@ -835,6 +975,7 @@ class MainActivity : AppCompatActivity() {
         textView: TextView,
         p: FlashTheme.Palette,
         endfield: Boolean,
+        meow: Boolean,
         density: Float,
         hairlinePx: Int
     ) {
@@ -848,6 +989,23 @@ class MainActivity : AppCompatActivity() {
             banner.setPadding(0, 0, (12f * density).toInt(), 0)
             val pTextV = (10f * density).toInt()
             textView.setPadding(0, pTextV, 0, pTextV)
+        } else if (meow) {
+            classicBar.visibility = View.VISIBLE
+            classicBar.background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = 999f * density
+                setColor(p.signal)
+            }
+            endfieldFlag.visibility = View.GONE
+            banner.background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = 16f * density
+                setColor(p.panelSubtle)
+                setStroke(hairlinePx, p.rule)
+            }
+            val p12 = (12f * density).toInt()
+            banner.setPadding(p12, p12, p12, p12)
+            textView.setPadding(0, 0, 0, 0)
         } else {
             classicBar.visibility = View.VISIBLE
             classicBar.setBackgroundColor(p.signal)
@@ -866,6 +1024,7 @@ class MainActivity : AppCompatActivity() {
         labelView: TextView,
         p: FlashTheme.Palette,
         endfield: Boolean,
+        meow: Boolean,
         density: Float
     ) {
         if (endfield) {
@@ -877,6 +1036,17 @@ class MainActivity : AppCompatActivity() {
             val pH = (10f * density).toInt()
             val pV = (6f * density).toInt()
             labelView.setPadding(pH, pV, pH, pV)
+        } else if (meow) {
+            hatchView.visibility = View.GONE
+            container.background = MeowEmptyCardDrawable(
+                fillColor = p.panelSubtle,
+                strokeColor = p.rule,
+                accentColor = p.signal,
+                density = density
+            )
+            labelView.setBackgroundColor(Color.TRANSPARENT)
+            labelView.setTextColor(p.ink2)
+            labelView.setPadding(0, 0, 0, 0)
         } else {
             hatchView.visibility = View.GONE
             container.setBackgroundResource(R.drawable.fs_tile_bg)
@@ -1105,6 +1275,17 @@ class MainActivity : AppCompatActivity() {
         }
         segStyleClassic.setOnClickListener { applyThemeStyle(FlashTheme.ThemeStyle.CLASSIC) }
         segStyleEndfield.setOnClickListener { applyThemeStyle(FlashTheme.ThemeStyle.ENDFIELD) }
+        segStyleMeow.setOnClickListener { applyThemeStyle(FlashTheme.ThemeStyle.MEOW) }
+        val onPetCat = View.OnClickListener {
+            meowCatMascot.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+            meowCatMascot.triggerPetLove()
+            showToast(
+                if (isCatAwakeNow) "喵呜~ 美短小猫被摸头超开心，继续守护你 ★"
+                else "嘘~ 小猫正在呼呼大睡，完成全部设置就能叫醒它哦 zZ"
+            )
+        }
+        meowCatMascot.setOnClickListener(onPetCat)
+        meowHomeHeroHeader.setOnClickListener(onPetCat)
         segThemeSystem.setOnClickListener { applyThemeOption(ConsoleFormatter.ThemeOption.SYSTEM) }
         segThemeLight.setOnClickListener { applyThemeOption(ConsoleFormatter.ThemeOption.LIGHT) }
         segThemeDark.setOnClickListener { applyThemeOption(ConsoleFormatter.ThemeOption.DARK) }
@@ -1186,6 +1367,7 @@ class MainActivity : AppCompatActivity() {
         keepAliveStepsContainer.removeAllViews()
         val density = resources.displayMetrics.density
         val endfield = FlashTheme.isEndfield(this)
+        val meow = FlashTheme.isMeow(this)
         val p = FlashTheme.palette(this)
         val hairlinePx = (1f * density).toInt().coerceAtLeast(1)
 
@@ -1193,10 +1375,15 @@ class MainActivity : AppCompatActivity() {
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.TOP
-                if (endfield) {
-                    background = EfCutDrawable.buildSquareBox(p.panelSubtle, p.rule, hairlinePx)
-                } else {
-                    setBackgroundResource(R.drawable.fs_tile_bg)
+                when {
+                    endfield -> background = EfCutDrawable.buildSquareBox(p.panelSubtle, p.rule, hairlinePx)
+                    meow -> background = GradientDrawable().apply {
+                        shape = GradientDrawable.RECTANGLE
+                        cornerRadius = 16f * density
+                        setColor(p.panelSubtle)
+                        setStroke(hairlinePx, p.rule)
+                    }
+                    else -> setBackgroundResource(R.drawable.fs_tile_bg)
                 }
                 val p12 = (12f * density).toInt()
                 setPadding(p12, p12, p12, p12)
@@ -1313,7 +1500,8 @@ class MainActivity : AppCompatActivity() {
             container = segStyle,
             items = listOf(
                 segStyleClassic to FlashTheme.ThemeStyle.CLASSIC,
-                segStyleEndfield to FlashTheme.ThemeStyle.ENDFIELD
+                segStyleEndfield to FlashTheme.ThemeStyle.ENDFIELD,
+                segStyleMeow to FlashTheme.ThemeStyle.MEOW
             ),
             active = current
         )
@@ -1322,14 +1510,19 @@ class MainActivity : AppCompatActivity() {
     private fun renderThemeSegmented() {
         val current = ConsoleFormatter.ThemeOption.fromNightMode(statsStore.uiThemeMode)
         val endfield = FlashTheme.isEndfield(this)
-        btnThemeQuick.text = if (endfield) {
-            when (current) {
+        val meow = FlashTheme.isMeow(this)
+        btnThemeQuick.text = when {
+            endfield -> when (current) {
                 ConsoleFormatter.ThemeOption.SYSTEM -> "AUTO"
                 ConsoleFormatter.ThemeOption.LIGHT -> "LIGHT"
                 ConsoleFormatter.ThemeOption.DARK -> "DARK"
             }
-        } else {
-            current.headerLabel
+            meow -> when (current) {
+                ConsoleFormatter.ThemeOption.SYSTEM -> "自动喵"
+                ConsoleFormatter.ThemeOption.LIGHT -> "日间喵"
+                ConsoleFormatter.ThemeOption.DARK -> "夜猫"
+            }
+            else -> current.headerLabel
         }
         btnThemeQuick.contentDescription = "切换界面明暗配色，当前：${current.label}"
         renderSegmentedGroup(
@@ -1349,18 +1542,32 @@ class MainActivity : AppCompatActivity() {
         active: T
     ) {
         val endfield = FlashTheme.isEndfield(this)
+        val meow = FlashTheme.isMeow(this)
         val p = FlashTheme.palette(this)
         val density = resources.displayMetrics.density
         val focusStrokePx = resources.getDimensionPixelSize(R.dimen.ef_focus_stroke).coerceAtLeast(2)
         val hairlinePx = (1f * density).toInt().coerceAtLeast(1)
 
-        if (endfield) {
-            container.background = EfCutDrawable.buildSquareBox(p.panel, p.ink, hairlinePx)
-            container.setPadding(0, 0, 0, 0)
-        } else {
-            container.setBackgroundResource(R.drawable.fs_tile_bg)
-            val pad = (4f * density).toInt()
-            container.setPadding(pad, pad, pad, pad)
+        when {
+            endfield -> {
+                container.background = EfCutDrawable.buildSquareBox(p.panel, p.ink, hairlinePx)
+                container.setPadding(0, 0, 0, 0)
+            }
+            meow -> {
+                container.background = GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE
+                    cornerRadius = 16f * density
+                    setColor(p.panelSubtle)
+                    setStroke(hairlinePx, p.rule)
+                }
+                val pad = (4f * density).toInt()
+                container.setPadding(pad, pad, pad, pad)
+            }
+            else -> {
+                container.setBackgroundResource(R.drawable.fs_tile_bg)
+                val pad = (4f * density).toInt()
+                container.setPadding(pad, pad, pad, pad)
+            }
         }
 
         items.forEach { (view, opt) ->
@@ -1397,7 +1604,7 @@ class MainActivity : AppCompatActivity() {
                         focusStrokeColor = p.panel,
                         strokeWidthPx = focusStrokePx,
                         insetPx = (2f * density).toInt().coerceAtLeast(2),
-                        cornerRadiusPx = 10f * density
+                        cornerRadiusPx = if (meow) 14f * density else 10f * density
                     )
                     view.setTextColor(p.onSignal)
                     view.typeface = Typeface.DEFAULT_BOLD
@@ -1411,18 +1618,36 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun selectTab(index: Int, scrollToTop: Boolean) {
-        activeTab = index.coerceIn(0, tabPanels.lastIndex)
+        val nextTab = index.coerceIn(0, tabPanels.lastIndex)
+        if (nextTab == 0 && activeTab != 0) {
+            randomizeAwakeCatPose()
+            refreshUi(forceLog = false)
+        }
+        activeTab = nextTab
+        meowBackdrop.setActiveTab(activeTab)
         tabPanels.forEachIndexed { idx, panel ->
             panel.visibility = if (idx == activeTab) View.VISIBLE else View.GONE
         }
 
         val endfield = FlashTheme.isEndfield(this)
+        val meow = FlashTheme.isMeow(this)
         val p = FlashTheme.palette(this)
         val density = resources.displayMetrics.density
         val focusStroke = resources.getDimensionPixelSize(R.dimen.ef_focus_stroke).coerceAtLeast(2)
 
         tabNavBar.setBackgroundColor(p.panel)
         navDivider.setBackgroundColor(p.rule)
+
+        val meowIcons = listOf(
+            R.drawable.ic_meow_nav_home,
+            R.drawable.ic_meow_nav_shield,
+            R.drawable.ic_meow_nav_settings
+        )
+        val classicIcons = listOf(
+            R.drawable.fs_nav_home,
+            R.drawable.fs_nav_shield,
+            R.drawable.fs_nav_settings
+        )
 
         tabViews.forEachIndexed { idx, slot ->
             val selected = (idx == activeTab)
@@ -1459,17 +1684,20 @@ class MainActivity : AppCompatActivity() {
                 }
             } else {
                 slot.icon.visibility = View.VISIBLE
+                slot.icon.setImageResource(if (meow) meowIcons[idx] else classicIcons[idx])
                 slot.enLabel.visibility = View.GONE
+                val activeFg = if (meow) (if (p.isDark) p.signal else p.trace) else p.signal
+                val activeBg = if (meow) p.chip else p.tagBg
                 if (selected) {
                     slot.container.background = EfCutDrawable.buildInsetFocusSelector(
-                        fillColor = p.tagBg,
+                        fillColor = activeBg,
                         focusStrokeColor = p.trace,
                         strokeWidthPx = focusStroke,
                         insetPx = 0,
-                        cornerRadiusPx = 12f * density
+                        cornerRadiusPx = if (meow) 18f * density else 12f * density
                     )
-                    ImageViewCompat.setImageTintList(slot.icon, ColorStateList.valueOf(p.signal))
-                    slot.zhLabel.setTextColor(p.signal)
+                    ImageViewCompat.setImageTintList(slot.icon, ColorStateList.valueOf(activeFg))
+                    slot.zhLabel.setTextColor(activeFg)
                     slot.zhLabel.typeface = Typeface.DEFAULT_BOLD
                 } else {
                     slot.container.setBackgroundResource(R.drawable.ef_focus_row_bg)
@@ -1490,6 +1718,7 @@ class MainActivity : AppCompatActivity() {
         testLabListContainer.removeAllViews()
         val density = resources.displayMetrics.density
         val endfield = FlashTheme.isEndfield(this)
+        val meow = FlashTheme.isMeow(this)
         val p = FlashTheme.palette(this)
         val hairlinePx = (1f * density).toInt().coerceAtLeast(1)
 
@@ -1519,10 +1748,15 @@ class MainActivity : AppCompatActivity() {
 
             val groupBox = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
-                if (endfield) {
-                    background = EfCutDrawable.buildSquareBox(p.panelSubtle, p.rule, hairlinePx)
-                } else {
-                    setBackgroundResource(R.drawable.fs_tile_bg)
+                when {
+                    endfield -> background = EfCutDrawable.buildSquareBox(p.panelSubtle, p.rule, hairlinePx)
+                    meow -> background = GradientDrawable().apply {
+                        shape = GradientDrawable.RECTANGLE
+                        cornerRadius = 16f * density
+                        setColor(p.panelSubtle)
+                        setStroke(hairlinePx, p.rule)
+                    }
+                    else -> setBackgroundResource(R.drawable.fs_tile_bg)
                 }
             }
 
@@ -1641,8 +1875,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun applyStatusPillStyle(view: TextView, tone: ConsoleFormatter.StatusTone) {
         val endfield = FlashTheme.isEndfield(this)
+        val meow = FlashTheme.isMeow(this)
         val p = FlashTheme.palette(this)
-        if (!endfield) {
+        if (!endfield && !meow) {
             val (bgRes, fgRes) = when (tone) {
                 ConsoleFormatter.StatusTone.OK -> R.drawable.ef_state_active_bg to R.color.fs_status_ok_fg
                 ConsoleFormatter.StatusTone.WARN -> R.drawable.ef_state_dashed_bg to R.color.fs_status_warn_fg
@@ -1656,6 +1891,22 @@ class MainActivity : AppCompatActivity() {
 
         val d = resources.displayMetrics.density
         val strokePx = (1f * d).toInt().coerceAtLeast(1)
+        if (meow) {
+            val (bgColor, fgColor, stColor) = when (tone) {
+                ConsoleFormatter.StatusTone.OK -> Triple(p.statusOkBg, p.statusOkFg, p.statusOkStroke)
+                ConsoleFormatter.StatusTone.WARN -> Triple(p.statusWarnBg, p.statusWarnFg, p.statusWarnStroke)
+                ConsoleFormatter.StatusTone.PAUSED -> Triple(p.statusPausedBg, p.statusPausedFg, p.statusPausedStroke)
+                ConsoleFormatter.StatusTone.ALERT -> Triple(p.statusAlertBg, p.statusAlertFg, p.statusAlertStroke)
+            }
+            view.background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = 999f * d
+                setColor(bgColor)
+                if (stColor != null) setStroke(strokePx, stColor)
+            }
+            view.setTextColor(fgColor)
+            return
+        }
         when (tone) {
             ConsoleFormatter.StatusTone.OK -> {
                 // Solid box = live
@@ -1717,6 +1968,29 @@ class MainActivity : AppCompatActivity() {
         tvCmdStatus.text = headerStatus.label
         applyStatusPillStyle(tvCmdStatus, headerStatus.tone)
 
+        // Endfield HUD Strip & Meow Cat Mascot Sync
+        if (FlashTheme.isEndfield(this)) {
+            efHomeHudStrip.updateTelemetry(ConsoleFormatter.formatEndfieldHud(status, observeOnly))
+        }
+        val summarySnapshot = statsStore.getSummary()
+        if (FlashTheme.isMeow(this)) {
+            val catUi = ConsoleFormatter.formatMeowCat(
+                status = status,
+                observeOnly = observeOnly,
+                todaySkipped = summarySnapshot.todaySkipped,
+                preferredAwakePose = currentAwakeCatPose
+            )
+            isCatAwakeNow = catUi.isAwake
+            meowCatMascot.setPose(catUi.pose)
+            tvMeowMoodTag.text = catUi.titleTag
+            tvMeowSpeech.text = catUi.speechText
+            tvMeowPetHint.text = if (catUi.isAwake) {
+                "轻点美短小猫可以摸摸头 ★"
+            } else {
+                "开启全部设置就能叫醒美短小猫哦 zZ"
+            }
+        }
+
         // Home Hero Card
         val hero = ConsoleFormatter.formatHomeHero(status, observeOnly)
         tvStatusBadge.text = hero.badgeText
@@ -1727,11 +2001,22 @@ class MainActivity : AppCompatActivity() {
             applyStatusPillStyle(tvKeepAliveBadge, ConsoleFormatter.StatusTone.OK)
         } else {
             val pTheme = FlashTheme.palette(this)
-            if (FlashTheme.isEndfield(this)) {
-                val strokePx = (1f * resources.displayMetrics.density).toInt().coerceAtLeast(1)
-                tvKeepAliveBadge.background = EfCutDrawable.buildSquareBox(pTheme.chip, pTheme.rule, strokePx)
-            } else {
-                tvKeepAliveBadge.setBackgroundResource(R.drawable.fs_tile_bg)
+            val strokePx = (1f * resources.displayMetrics.density).toInt().coerceAtLeast(1)
+            when {
+                FlashTheme.isEndfield(this) -> {
+                    tvKeepAliveBadge.background = EfCutDrawable.buildSquareBox(pTheme.chip, pTheme.rule, strokePx)
+                }
+                FlashTheme.isMeow(this) -> {
+                    tvKeepAliveBadge.background = GradientDrawable().apply {
+                        shape = GradientDrawable.RECTANGLE
+                        cornerRadius = 999f * resources.displayMetrics.density
+                        setColor(pTheme.chip)
+                        setStroke(strokePx, pTheme.rule)
+                    }
+                }
+                else -> {
+                    tvKeepAliveBadge.setBackgroundResource(R.drawable.fs_tile_bg)
+                }
             }
             tvKeepAliveBadge.setTextColor(pTheme.ink2)
         }

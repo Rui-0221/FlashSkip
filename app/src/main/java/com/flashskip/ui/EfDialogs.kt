@@ -47,14 +47,20 @@ object EfDialogs {
     ): AlertDialog {
         val density = activity.resources.displayMetrics.density
         val endfield = FlashTheme.isEndfield(activity)
+        val meow = FlashTheme.isMeow(activity)
         val p = FlashTheme.palette(activity)
         val pad = (20f * density).toInt()
         val extraCutClearance = if (endfield) (8f * density).toInt() else 0
+        val topPad = when {
+            endfield -> (22f * density).toInt()
+            meow -> (28f * density).toInt()
+            else -> pad
+        }
 
         val root = buildDialogFrame(activity)
         val content = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(pad, if (endfield) (22f * density).toInt() else pad, pad, pad + extraCutClearance)
+            setPadding(pad, topPad, pad, pad + extraCutClearance)
         }
 
         val resolvedEyebrow = eyebrow.ifBlank { if (confirmDanger) "CONFIRM DELETE" else "CONFIRM" }
@@ -121,14 +127,20 @@ object EfDialogs {
     ): AlertDialog {
         val density = activity.resources.displayMetrics.density
         val endfield = FlashTheme.isEndfield(activity)
+        val meow = FlashTheme.isMeow(activity)
         val p = FlashTheme.palette(activity)
         val pad = (20f * density).toInt()
         val extraCutClearance = if (endfield) (8f * density).toInt() else 0
+        val topPad = when {
+            endfield -> (22f * density).toInt()
+            meow -> (28f * density).toInt()
+            else -> pad
+        }
 
         val root = buildDialogFrame(activity)
         val content = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(pad, if (endfield) (22f * density).toInt() else pad, pad, pad + extraCutClearance)
+            setPadding(pad, topPad, pad, pad + extraCutClearance)
         }
 
         if (endfield) {
@@ -148,6 +160,8 @@ object EfDialogs {
             if (endfield) {
                 background = FlashTheme.buildEndfieldInputBg(activity, p)
                 EfTypeface.applyField(this)
+            } else if (meow) {
+                background = FlashTheme.buildMeowInputBg(activity, p)
             } else {
                 setBackgroundResource(R.drawable.ef_input_bg)
             }
@@ -231,14 +245,20 @@ object EfDialogs {
     ): AlertDialog {
         val density = activity.resources.displayMetrics.density
         val endfield = FlashTheme.isEndfield(activity)
+        val meow = FlashTheme.isMeow(activity)
         val p = FlashTheme.palette(activity)
         val pad = (20f * density).toInt()
         val extraCutClearance = if (endfield) (8f * density).toInt() else 0
+        val topPad = when {
+            endfield -> (22f * density).toInt()
+            meow -> (28f * density).toInt()
+            else -> pad
+        }
 
         val root = buildDialogFrame(activity)
         val content = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(pad, if (endfield) (22f * density).toInt() else pad, pad, pad + extraCutClearance)
+            setPadding(pad, topPad, pad, pad + extraCutClearance)
         }
         val resolvedEyebrow = eyebrow.ifBlank { "SELECT" }
         if (endfield) {
@@ -363,14 +383,20 @@ object EfDialogs {
     ): AlertDialog {
         val density = activity.resources.displayMetrics.density
         val endfield = FlashTheme.isEndfield(activity)
+        val meow = FlashTheme.isMeow(activity)
         val p = FlashTheme.palette(activity)
         val pad = (20f * density).toInt()
         val extraCutClearance = if (endfield) (8f * density).toInt() else 0
+        val topPad = when {
+            endfield -> (22f * density).toInt()
+            meow -> (28f * density).toInt()
+            else -> pad
+        }
 
         val root = buildDialogFrame(activity)
         val content = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(pad, if (endfield) (22f * density).toInt() else pad, pad, pad + extraCutClearance)
+            setPadding(pad, topPad, pad, pad + extraCutClearance)
         }
         if (endfield) {
             content.addView(makeEndfieldEyebrow(activity, "// GUIDE", p))
@@ -473,6 +499,7 @@ object EfDialogs {
         val context = host.context
         val density = context.resources.displayMetrics.density
         val endfield = FlashTheme.isEndfield(context)
+        val meow = FlashTheme.isMeow(context)
         val p = FlashTheme.palette(context)
 
         val bar = LinearLayout(context).apply {
@@ -481,6 +508,14 @@ object EfDialogs {
             if (endfield) {
                 setBackgroundColor(p.toastBg)
                 elevation = 0f
+            } else if (meow) {
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE
+                    cornerRadius = 999f * density
+                    setColor(p.toastBg)
+                    setStroke((1.5f * density).toInt().coerceAtLeast(1), p.signal)
+                }
+                elevation = 3f * density
             } else {
                 background = GradientDrawable().apply {
                     shape = GradientDrawable.RECTANGLE
@@ -498,6 +533,15 @@ object EfDialogs {
                 (6f * density).toInt(),
                 ViewGroup.LayoutParams.MATCH_PARENT
             ))
+        } else if (meow) {
+            val pawBadge = android.widget.ImageView(context).apply {
+                setImageResource(R.drawable.ic_meow_paw)
+                imageTintList = android.content.res.ColorStateList.valueOf(p.signal)
+            }
+            val size = (20f * density).toInt()
+            bar.addView(pawBadge, LinearLayout.LayoutParams(size, size).apply {
+                marginStart = (14f * density).toInt()
+            })
         }
 
         val tv = TextView(context).apply {
@@ -564,21 +608,34 @@ object EfDialogs {
     private fun buildDialogFrame(activity: Activity): LinearLayout {
         val density = activity.resources.displayMetrics.density
         val endfield = FlashTheme.isEndfield(activity)
+        val meow = FlashTheme.isMeow(activity)
         val p = FlashTheme.palette(activity)
         return LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            background = if (endfield) {
-                EfCutDrawable.buildEndfieldPanel(
+            background = when {
+                endfield -> EfCutDrawable.buildEndfieldPanel(
                     fillColor = p.panel,
                     ruleColor = p.rule,
                     tabColor = p.ink,
                     strokeWidthPx = (1f * density).coerceAtLeast(1f),
                     cutBottomRightPx = 26f * density,
                     tabWidthPx = (56f * density).toInt(),
-                    tabHeightPx = (5f * density).toInt()
+                    tabHeightPx = (5f * density).toInt(),
+                    signalColor = p.signal,
+                    isDark = p.isDark,
+                    density = density
                 )
-            } else {
-                GradientDrawable().apply {
+                meow -> MeowPanelDrawable(
+                    fillColor = p.panel,
+                    strokeColor = p.rule,
+                    lipColor = p.rule,
+                    pawColor = p.signal,
+                    cornerRadiusPx = 24f * density,
+                    strokeWidthPx = (1.5f * density).coerceAtLeast(1f),
+                    density = density,
+                    showCatEars = true
+                )
+                else -> GradientDrawable().apply {
                     shape = GradientDrawable.RECTANGLE
                     cornerRadius = 20f * density
                     setColor(p.panel)

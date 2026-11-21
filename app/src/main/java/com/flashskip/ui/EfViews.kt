@@ -75,7 +75,8 @@ class EfHatchView @JvmOverloads constructor(
 /**
  * Segmented progress bar backed by proportional readiness/window data:
  * - Classic theme: soft rounded pill segments.
- * - Endfield theme: sharp 0dp mechanical square blocks (`#FFFA00` / `trace` active, `chip` inactive).
+ * - Endfield theme: sharp 0dp mechanical square blocks + subtle surveyor calibration ruler ticks.
+ * - Meow theme: 8 adorable paw prints for readiness, or candy rounded beans for timing.
  */
 class EfSegmentBarView @JvmOverloads constructor(
     context: Context,
@@ -87,17 +88,24 @@ class EfSegmentBarView @JvmOverloads constructor(
     private var filledSegments = 0
     private var useSignalFill = true
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    private val tickPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     private val rect = RectF()
 
     fun setSegments(filled: Int, total: Int = 24, useSignal: Boolean = true) {
         totalSegments = total.coerceAtLeast(1)
         filledSegments = filled.coerceIn(0, totalSegments)
         useSignalFill = useSignal
+        requestLayout()
         invalidate()
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        val defaultDp = if (FlashTheme.isEndfield(context)) 10f else 8f
+        val defaultDp = when {
+            FlashTheme.isMeow(context) && useSignalFill -> 20f
+            FlashTheme.isMeow(context) -> 12f
+            FlashTheme.isEndfield(context) -> 14f
+            else -> 8f
+        }
         val defaultH = (defaultDp * resources.displayMetrics.density).toInt()
         val h = resolveSize(defaultH, heightMeasureSpec)
         val w = MeasureSpec.getSize(widthMeasureSpec)
@@ -111,24 +119,56 @@ class EfSegmentBarView @JvmOverloads constructor(
         if (w <= 0f || h <= 0f) return
 
         val endfield = FlashTheme.isEndfield(context)
+        val meow = FlashTheme.isMeow(context)
         val p = FlashTheme.palette(context)
         val d = resources.displayMetrics.density
+        val activeColor = if (useSignalFill) p.signal else p.trace
+        val inactiveColor = p.chip
+
+        if (meow && useSignalFill) {
+            val pawCount = 8
+            val filledPaws = ((filledSegments.toFloat() / totalSegments) * pawCount).toInt().coerceIn(0, pawCount)
+            val slotW = w / pawCount
+            val pawR = minOf(h * 0.44f, slotW * 0.28f).coerceAtLeast(3f * d)
+            val cy = h * 0.54f
+            for (i in 0 until pawCount) {
+                val cx = slotW * (i + 0.5f)
+                paint.color = if (i < filledPaws) activeColor else inactiveColor
+                MeowBackdropView.drawMiniPaw(canvas, cx, cy, pawR, if (i % 2 == 0) -6f else 6f, paint)
+            }
+            return
+        }
+
         val gap = (if (endfield) 2f else 3f) * d
         val totalGap = gap * (totalSegments - 1)
         val segW = ((w - totalGap) / totalSegments).coerceAtLeast(1f)
-        val radius = if (endfield) 0f else minOf(h, segW) * 0.5f
-
-        val activeColor = if (useSignalFill) p.signal else p.trace
-        val inactiveColor = p.chip
+        val barH = if (endfield) (h - 4f * d).coerceAtLeast(4f * d) else h
+        val radius = if (endfield) 0f else minOf(barH, segW) * 0.5f
 
         for (i in 0 until totalSegments) {
             val left = i * (segW + gap)
             paint.color = if (i < filledSegments) activeColor else inactiveColor
-            rect.set(left, 0f, left + segW, h)
+            rect.set(left, 0f, left + segW, barH)
             if (radius > 0f) {
                 canvas.drawRoundRect(rect, radius, radius, paint)
+                if (meow && i < filledSegments && barH >= 6f * d) {
+                    paint.color = Color.argb(90, 255, 255, 255)
+                    canvas.drawCircle(left + segW * 0.5f, barH * 0.35f, 1.1f * d, paint)
+                }
             } else {
                 canvas.drawRect(rect, paint)
+            }
+        }
+
+        if (endfield) {
+            tickPaint.strokeWidth = 1f * d
+            val tickTop = barH + 1.5f * d
+            for (i in 0..totalSegments) {
+                val tx = (i * (segW + gap) - gap * 0.5f).coerceIn(0.5f * d, w - 0.5f * d)
+                val major = (i % 6 == 0)
+                tickPaint.color = if (major) p.ink2 else p.rule
+                val tickBottom = if (major) h else (tickTop + 1.5f * d).coerceAtMost(h)
+                canvas.drawLine(tx, tickTop, tx, tickBottom, tickPaint)
             }
         }
     }

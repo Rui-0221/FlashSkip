@@ -60,7 +60,8 @@ object EfCutDrawable {
 
     /**
      * Builds an Endfield dashboard panel (`panel` fill, 1dp `rule` border, bottom-right cut,
-     * plus a 56dp x 5dp dark ink tab anchored at top-left).
+     * plus a 56dp x 5dp dark ink tab anchored at top-left, yellow tactical chamfer wedge,
+     * and L-bracket framing corners).
      */
     fun buildEndfieldPanel(
         fillColor: Int,
@@ -69,26 +70,22 @@ object EfCutDrawable {
         strokeWidthPx: Float,
         cutBottomRightPx: Float,
         tabWidthPx: Int,
-        tabHeightPx: Int
-    ): Drawable {
-        val body = build(
-            fillColor = fillColor,
-            strokeColor = ruleColor,
-            strokeWidthPx = strokeWidthPx,
-            cutBottomRightPx = cutBottomRightPx,
-            useCutCorners = true
-        )
-        val tab = GradientDrawable().apply {
-            shape = GradientDrawable.RECTANGLE
-            cornerRadius = 0f
-            setColor(tabColor)
-            setSize(tabWidthPx, tabHeightPx)
-        }
-        return LayerDrawable(arrayOf(body, tab)).apply {
-            setLayerGravity(1, Gravity.TOP or Gravity.START)
-            setLayerSize(1, tabWidthPx, tabHeightPx)
-        }
-    }
+        tabHeightPx: Int,
+        signalColor: Int = 0xFFFFFA00.toInt(),
+        isDark: Boolean = false,
+        density: Float = 3f
+    ): Drawable = EndfieldPanelDrawable(
+        fillColor = fillColor,
+        ruleColor = ruleColor,
+        tabColor = tabColor,
+        signalColor = signalColor,
+        isDark = isDark,
+        strokeWidthPx = strokeWidthPx,
+        cutBottomRightPx = cutBottomRightPx,
+        tabWidthPx = tabWidthPx,
+        tabHeightPx = tabHeightPx,
+        density = density
+    )
 
     /**
      * Builds a crisp 0dp box (with optional dashed stroke for background/connecting states).
