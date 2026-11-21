@@ -1277,10 +1277,15 @@ class MainActivity : AppCompatActivity() {
         segStyleEndfield.setOnClickListener { applyThemeStyle(FlashTheme.ThemeStyle.ENDFIELD) }
         segStyleMeow.setOnClickListener { applyThemeStyle(FlashTheme.ThemeStyle.MEOW) }
         val onPetCat = View.OnClickListener {
+            val awakeNow = ConsoleFormatter.isCatAwakeReady(
+                PermissionHelper.readStatus(this),
+                statsStore.observeOnly
+            )
+            isCatAwakeNow = awakeNow
             meowCatMascot.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
             meowCatMascot.triggerPetLove()
             showToast(
-                if (isCatAwakeNow) "喵呜~ 美短小猫被摸头超开心，继续守护你 ★"
+                if (awakeNow) "喵呜~ 美短小猫被摸头超开心，继续守护你 ★"
                 else "嘘~ 小猫正在呼呼大睡，完成全部设置就能叫醒它哦 zZ"
             )
         }

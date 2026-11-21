@@ -1,5 +1,7 @@
 package com.flashskip.ui
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Canvas
@@ -395,6 +397,7 @@ class MeowCatMascotView @JvmOverloads constructor(
 
     private var idleAnimator: ValueAnimator? = null
     private var petAnimator: ValueAnimator? = null
+    private val clearPetRunnable = Runnable { resetPetAnimation() }
     private val drawableCache = mutableMapOf<ConsoleFormatter.MeowCatPose, Drawable?>()
 
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
@@ -406,9 +409,22 @@ class MeowCatMascotView @JvmOverloads constructor(
         contentDescription = "美短猫咪守护伙伴，轻点可以摸摸头"
     }
 
+    private fun resetPetAnimation() {
+        removeCallbacks(clearPetRunnable)
+        val anim = petAnimator
+        petAnimator = null
+        anim?.cancel()
+        if (isPetted || petProgress != 0f) {
+            isPetted = false
+            petProgress = 0f
+            invalidate()
+        }
+    }
+
     fun setPose(newPose: ConsoleFormatter.MeowCatPose) {
         if (currentPose == newPose) return
         currentPose = newPose
+        resetPetAnimation()
         syncIdleAnimator()
         invalidate()
     }
@@ -422,27 +438,44 @@ class MeowCatMascotView @JvmOverloads constructor(
     }
 
     fun triggerPetLove() {
+        removeCallbacks(clearPetRunnable)
+        val prevAnim = petAnimator
+        petAnimator = null
+        prevAnim?.cancel()
+
         isPetted = true
         if (!ValueAnimator.areAnimatorsEnabled()) {
-            petProgress = 0.5f
+            petProgress = 0.35f
             invalidate()
-            postDelayed({
-                isPetted = false
-                petProgress = 0f
-                invalidate()
-            }, 1400L)
+            postDelayed(clearPetRunnable, 1200L)
             return
         }
-        petAnimator?.cancel()
+        petProgress = 0f
         petAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = 1600L
+            duration = 1200L
             addUpdateListener { anim ->
                 petProgress = anim.animatedValue as Float
-                if (petProgress >= 1f) {
-                    isPetted = false
-                }
                 invalidate()
             }
+            addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    if (petAnimator === animation) {
+                        petAnimator = null
+                        isPetted = false
+                        petProgress = 0f
+                        invalidate()
+                    }
+                }
+
+                override fun onAnimationCancel(animation: Animator) {
+                    if (petAnimator === animation) {
+                        petAnimator = null
+                        isPetted = false
+                        petProgress = 0f
+                        invalidate()
+                    }
+                }
+            })
             start()
         }
     }
@@ -467,16 +500,29 @@ class MeowCatMascotView @JvmOverloads constructor(
     override fun onDetachedFromWindow() {
         idleAnimator?.cancel()
         idleAnimator = null
-        petAnimator?.cancel()
-        petAnimator = null
+        resetPetAnimation()
         super.onDetachedFromWindow()
     }
 
     override fun onWindowVisibilityChanged(visibility: Int) {
         super.onWindowVisibilityChanged(visibility)
-        if (visibility == VISIBLE) syncIdleAnimator() else {
+        if (visibility == VISIBLE) {
+            syncIdleAnimator()
+        } else {
             idleAnimator?.cancel()
             idleAnimator = null
+            resetPetAnimation()
+        }
+    }
+
+    override fun onVisibilityChanged(changedView: View, visibility: Int) {
+        super.onVisibilityChanged(changedView, visibility)
+        if (isShown) {
+            syncIdleAnimator()
+        } else {
+            idleAnimator?.cancel()
+            idleAnimator = null
+            resetPetAnimation()
         }
     }
 
@@ -564,19 +610,16 @@ class MeowCatMascotView @JvmOverloads constructor(
             canvas.restoreToCount(save)
         }
 
-        // 3. Cute floating FX (sparkles on tap-to-pet, or tiny ambient star/flash when awake)
+        // 3. Transient tap-to-pet sparkles near top/head area (none drawn at rest so tail stays unobstructed)
         if (isPetted) {
-            val rise = petProgress * 18f * d
-            val alpha = ((1f - petProgress) * 255).toInt().coerceIn(0, 255)
+            val rise = petProgress * 16f * d
+            val fade = sin(petProgress * PI.toFloat()).coerceIn(0f, 1f)
+            val alpha = (fade * 255).toInt().coerceIn(0, 255)
             fillPaint.color = Color.argb(alpha, 255, 212, 82)
-            MeowBackdropView.drawSparkle(canvas, w * 0.16f, h * 0.24f - rise, 6.2f * d, fillPaint)
-            MeowBackdropView.drawSparkle(canvas, w * 0.84f, h * 0.20f - rise * 1.15f, 5.4f * d, fillPaint)
+            MeowBackdropView.drawSparkle(canvas, w * 0.14f, h * 0.22f - rise, 6.0f * d, fillPaint)
+            MeowBackdropView.drawSparkle(canvas, w * 0.46f, h * 0.12f - rise * 0.9f, 5.2f * d, fillPaint)
             fillPaint.color = Color.argb(alpha, Color.red(p.signal), Color.green(p.signal), Color.blue(p.signal))
-            MeowBackdropView.drawSparkle(canvas, w * 0.50f, h * 0.10f - rise * 0.9f, 5.8f * d, fillPaint)
-        } else if (isAwake) {
-            val dy = sin(idlePhase * 1.4f) * 1.8f * d
-            fillPaint.color = Color.argb(210, 255, 217, 102)
-            MeowBackdropView.drawSparkle(canvas, w * 0.88f, h * 0.16f + dy, 4.6f * d, fillPaint)
+            MeowBackdropView.drawSparkle(canvas, w * 0.26f, h * 0.10f - rise * 1.1f, 5.6f * d, fillPaint)
         }
     }
 }

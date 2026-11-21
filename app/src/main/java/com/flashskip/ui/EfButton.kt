@@ -143,6 +143,30 @@ class EfButton @JvmOverloads constructor(
         invalidate()
     }
 
+    override fun onDetachedFromWindow() {
+        resetPressState()
+        super.onDetachedFromWindow()
+    }
+
+    override fun onWindowVisibilityChanged(visibility: Int) {
+        super.onWindowVisibilityChanged(visibility)
+        if (visibility != VISIBLE) {
+            resetPressState()
+        }
+    }
+
+    private fun resetPressState() {
+        val anim = wipeAnimator
+        wipeAnimator = null
+        anim?.cancel()
+        if (wipeFraction != 0f || wasPressedState) {
+            wipeFraction = 0f
+            wasPressedState = false
+            syncTextColor()
+            invalidate()
+        }
+    }
+
     private fun animatePress(target: Float, durationMs: Long, endfield: Boolean) {
         wipeAnimator?.cancel()
         if (!ValueAnimator.areAnimatorsEnabled()) {

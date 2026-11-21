@@ -1,6 +1,6 @@
 # FlashSkip（闪跳）
 
-[![Version](https://img.shields.io/badge/Version-1.0.0-161616.svg)](#)
+[![Version](https://img.shields.io/badge/Version-1.0.1-161616.svg)](#)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.0.21-7F52FF.svg)](https://kotlinlang.org)
 [![Android](https://img.shields.io/badge/Android-8.0%2B%20(API%2026--34)-3DDC84.svg)](https://developer.android.com)
 [![Network](https://img.shields.io/badge/Network-Zero%20Permission-0A7EA4.svg)](#隐私与安全设计)
