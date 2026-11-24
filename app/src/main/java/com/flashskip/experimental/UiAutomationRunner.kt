@@ -378,8 +378,9 @@ class UiAutomationRunner(private val context: Context) : ISkipRunner.Stub() {
             }
             return
         }
-        val attempt = Verification(command, window, evidence, SystemClock.uptimeMillis(), result.actualMethod,
-            foreground.returnWindowFor(window))
+        val dispatchedAt = SystemClock.uptimeMillis()
+        val attempt = Verification(command, window, evidence, dispatchedAt, result.actualMethod,
+            foreground.returnWindowFor(window, result.inputStartedAtMs ?: dispatchedAt))
         pending = attempt
         worker.postDelayed({ verify(attempt, eventAt) }, PROBE_MS)
     }

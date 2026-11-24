@@ -79,8 +79,11 @@ class ForegroundEvents {
     fun resumeWindow(nowMs: Long): ForegroundWindow? =
         resumeSignal?.takeIf { nowMs - it.startedAt < RESUME_PROBE_MS }?.expected
 
-    fun returnWindowFor(origin: ForegroundWindow): ForegroundWindow? =
-        previousApplicationWindows[origin.packageName]?.takeIf { it != origin }
+    /** A cached window only supports closure for the window tracked in the current resume. */
+    fun returnWindowFor(origin: ForegroundWindow, actionAtMs: Long): ForegroundWindow? {
+        if (resumeWindow(actionAtMs) != origin) return null
+        return previousApplicationWindows[origin.packageName]?.takeIf { it != origin }
+    }
 
     /** The adapter has observed a complete, full-screen window with no visible ad signal. */
     fun rememberReturnWindow(window: ForegroundWindow) {

@@ -597,7 +597,8 @@ class SkipAdService : AccessibilityService() {
                     val pending = ObservedAttempt(
                         command, tree.windowId, evidence, result.actualMethod, detectedAt, actionAt,
                         result.inputStartedAtMs, result.inputReturnedAtMs,
-                        originTime, matchUs, labTrace, foregroundEvents.returnWindowFor(identity)
+                        originTime, matchUs, labTrace,
+                        foregroundEvents.returnWindowFor(identity, result.inputStartedAtMs ?: actionAt)
                     )
                     pendingAttempt = pending
                     val decision = command.decision

@@ -82,9 +82,22 @@ class ForegroundEventsTest {
         events.onResumeWindowHint(previous.copy(id = 20), 1000L)
         val overlay = previous.copy(id = 20)
         events.recordFocusedApplication(overlay)
-        assertEquals(previous, events.returnWindowFor(overlay))
+        assertEquals(previous, events.returnWindowFor(overlay, 1200L))
+        assertNull(events.returnWindowFor(overlay.copy(id = 21), 1200L))
+        assertNull(events.returnWindowFor(overlay, 4800L))
         events.recordFocusedApplication(previous)
-        assertNull(events.returnWindowFor(previous))
+        assertNull(events.returnWindowFor(previous, 1400L))
+    }
+
+    @Test
+    fun `a cached same-package window alone cannot confirm a return`() {
+        val events = ForegroundEvents()
+        events.recordFocusedApplication(previous)
+        events.rememberReturnWindow(previous)
+        val navigation = previous.copy(id = 20)
+        events.recordFocusedApplication(navigation)
+
+        assertNull(events.returnWindowFor(navigation, 1200L))
     }
 
     @Test
