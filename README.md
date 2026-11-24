@@ -1,6 +1,7 @@
-<img src="docs/media/app-icon.png" width="88" align="right" alt="FlashSkip App Icon" />
-
-# FlashSkip（闪跳）
+<h1>
+  <img src="docs/media/app-icon.png" width="42" align="absmiddle" alt="FlashSkip App Icon" />
+  FlashSkip（闪跳）
+</h1>
 
 [![Version](https://img.shields.io/badge/Version-1.0.2-161616.svg)](#)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.0.21-7F52FF.svg)](https://kotlinlang.org)
