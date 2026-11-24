@@ -1,12 +1,16 @@
+<img src="docs/media/app-icon.png" width="88" align="right" alt="FlashSkip App Icon" />
+
 # FlashSkip（闪跳）
 
-[![Version](https://img.shields.io/badge/Version-1.0.1-161616.svg)](#)
+[![Version](https://img.shields.io/badge/Version-1.0.2-161616.svg)](#)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.0.21-7F52FF.svg)](https://kotlinlang.org)
 [![Android](https://img.shields.io/badge/Android-8.0%2B%20(API%2026--34)-3DDC84.svg)](https://developer.android.com)
 [![Network](https://img.shields.io/badge/Network-Zero%20Permission-0A7EA4.svg)](#隐私与安全设计)
 
 **FlashSkip** 是一款基于 Android 无障碍服务（`AccessibilityService`）的事件驱动开屏广告自动跳过工具——**无需 Root、零网络权限、纯本地运行**。通过纯 Kotlin 编写的规则与状态机引擎，在极短延迟内识别并点击“跳过”按钮，同时内置多层防误触机制，防止误点全屏广告落地页或正常业务按钮。
 
+> **v1.0.2 更新**：全新重设计自适应启动图标（`AdaptiveIcon` 靛紫→电光蓝渐变底 + 被截断的开屏倒计时环 + 闪电跳过符号「⏭」，并支持 Android 13+ 单色主题图标）。
+>
 > **v1.0.0 正式版**：新增 **三套可随时切换的界面主题（「日常简约 / 终末地 Endfield / 软萌猫咪」）**，强化终末地全屏等高线与二次元战术 HUD、搭载参考美短加白插画多姿态互动猫猫与磨砂大猫头背景；底层继承热重进（Hot Resume）有界延迟补查、未知焦点窗口安全识别、多品牌后台保活直达引导、跳过成功轻提示与可选 Shizuku（`UiAutomation`）双引擎。
 
 ---
