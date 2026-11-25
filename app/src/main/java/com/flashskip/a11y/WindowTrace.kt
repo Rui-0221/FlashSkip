@@ -57,6 +57,7 @@ internal class WindowTrace(private val engine: String) {
                     if (Build.VERSION.SDK_INT >= 33) window.getRoot(0) else window.root
                 }.getOrNull()
                 val id = root?.windowId ?: -1
+                val rawBounds = root?.let { android.graphics.Rect().also(it::getBoundsInScreen).bounds() }
                 val pkg = alias(root?.packageName)
                 val candidate = runCatching {
                     root?.let {
@@ -74,7 +75,8 @@ internal class WindowTrace(private val engine: String) {
                 val display = if (Build.VERSION.SDK_INT >= 30) window.displayId else 0
                 write("window t=$before trigger=$triggerAt offset=$offset windowId=${window.id} " +
                     "windowType=${window.type} layer=${window.layer} display=$display active=${window.isActive} " +
-                    "focused=${window.isFocused} rootId=$id rootPkg=$pkg readMs=${SystemClock.uptimeMillis() - before} $candidate")
+                    "focused=${window.isFocused} frame=${window.screenRect()} rootBounds=$rawBounds " +
+                    "rootId=$id rootPkg=$pkg readMs=${SystemClock.uptimeMillis() - before} $candidate")
             }
         } finally {
             windows.forEach { it.recycle() }

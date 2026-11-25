@@ -30,7 +30,8 @@ import com.flashskip.a11y.hasOrdinaryWindow
 import com.flashskip.a11y.readFocusedUnmapped
 import com.flashskip.a11y.showsReturnTo
 import com.flashskip.a11y.isFocusedApp
-import com.flashskip.a11y.isFocusedFullscreenApp
+import com.flashskip.a11y.ApplicationWindows
+import com.flashskip.a11y.AppSurface
 import com.flashskip.a11y.mayChangeForeground
 import com.flashskip.a11y.withFocusedAppWindow
 import com.flashskip.core.ActionCommand
@@ -72,6 +73,8 @@ class UiAutomationRunner(private val context: Context) : ISkipRunner.Stub() {
     private var lastScan = 0L
     private var tracedScanSession = -1L
     private var wasLocked = false
+    private val floatingTaskProof = FloatingTaskProof()
+    private val appWindows = ApplicationWindows(context, floatingTaskProof::verify) { automation?.windows.orEmpty() }
     private val windowTrace = WindowTrace("shizuku")
 
     private data class ActivityHint(val window: ForegroundWindow, val activity: String, val at: Long)
@@ -112,7 +115,8 @@ class UiAutomationRunner(private val context: Context) : ISkipRunner.Stub() {
                     eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED or
                         AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED or AccessibilityEvent.TYPE_WINDOWS_CHANGED
                     flags = flags or AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS or
-                        AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
+                        AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS or
+                        AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS
                 }
                 session.setOnAccessibilityEventListener { event ->
                     windowTrace.event(event, worker) { at, offset ->
@@ -145,13 +149,14 @@ class UiAutomationRunner(private val context: Context) : ISkipRunner.Stub() {
                                 foreground.onUnlocked(now)
                                 wasLocked = false
                             }
+                            appWindows.state(signaled, activity)
                             if (full && !PackagePolicy.isTransientOverlay(pkg, "", false) &&
                                 !PackagePolicy.isExcludedPackage(pkg, disabled)
                             ) {
                                 foreground.onResumeWindowHint(signaled, at)
                             }
                             if (PackagePolicy.isTransientOverlay(pkg, activity, full)) return@post
-                            if (full && activity.startsWith("$pkg.")) activityHint = ActivityHint(signaled, activity, at)
+                            if ((full || activity.endsWith("Activity")) && activity.startsWith("$pkg.")) activityHint = ActivityHint(signaled, activity, at)
                             foreground.onWindowSignal(id, now)
                             inspectForeground(at)
                         }
@@ -215,15 +220,17 @@ class UiAutomationRunner(private val context: Context) : ISkipRunner.Stub() {
             }
             val now = SystemClock.uptimeMillis()
             val size = displaySize() ?: return
-            val root = activeRoot(preferFocused = true)
+            val root = activeRoot()
             var labRoot = false
-            val unmapped = foreground.resumeWindow(now)
+            var surface: AppSurface? = null
+            val unmapped = expectedUnmapped(now)
             val window = try {
                 root?.let { node ->
+                    surface = appWindows.inspect(node, size.x, size.y, unmapped)
                     identity(node).takeIf { candidate ->
                         candidate.valid && (expectedWindow == null || expectedWindow == candidate) &&
                             !PackagePolicy.isTransientOverlay(candidate.packageName, "", false) &&
-                            node.isFocusedFullscreenApp(size.x, size.y, unmapped, ::confirmsFocus)
+                            surface != null
                     }?.also { candidate ->
                         if (candidate != foreground.verifiedWindow) {
                             labRoot = candidate.packageName == APP && node.hasVisibleNode("$APP:id/splashRoot")
@@ -231,8 +238,8 @@ class UiAutomationRunner(private val context: Context) : ISkipRunner.Stub() {
                                 node.hasOrdinaryWindow()
                             ) {
                                 val copy = AccessibilityNodeInfo.obtain(node)
-                                NodeExtractor.extract(copy, "", size.x, size.y, maxNodes = MAX_VERIFY_NODES).use { tree ->
-                                    if (tree.snapshot.complete && tree.snapshot.isFullScreen &&
+                                NodeExtractor.extract(copy, "", size.x, size.y, maxNodes = MAX_VERIFY_NODES, surface = surface).use { tree ->
+                                    if (tree.snapshot.complete && (tree.snapshot.isFullScreen || tree.snapshot.freeform != null) &&
                                         !TargetEvidence.hasVisibleAdSignal(tree.snapshot)
                                     ) {
                                         foreground.rememberReturnWindow(candidate)
@@ -260,16 +267,18 @@ class UiAutomationRunner(private val context: Context) : ISkipRunner.Stub() {
             if (moved) {
                 launch = window
                 SkipTrace.log("shizuku") { "phase=window_switch session=${machine.sessionId} kind=resume windowId=${window.id}" }
-            } else if (hint != null || entered || window.packageName != machine.activePackage) {
-                val activity = hint?.activity ?: when {
+            } else if (hint != null || entered || window.packageName != machine.activePackage || labRoot) {
+                val activity = when {
                     labRoot -> LAB
+                    hint != null -> hint.activity
+                    surface?.freeform != null -> appWindows.verifiedActivity(window).orEmpty()
                     window.packageName == machine.activePackage -> machine.activeActivity
                     else -> ""
                 }
                 machine.onWindowStateChanged(
                     window.packageName, activity, true, if (entered) now else hint?.at ?: now,
                     userDisabledPackages = disabled, selfTestPackage = APP, selfTestActivity = LAB,
-                    windowId = window.id, confirmedFullscreenActivity = hint != null,
+                    windowId = window.id, confirmedFullscreenActivity = hint != null || labRoot,
                     confirmedForegroundEntry = entered
                 )
                 if (!machine.armed || machine.sessionId != previousSession) launch = window.takeIf { machine.armed }
@@ -307,9 +316,11 @@ class UiAutomationRunner(private val context: Context) : ISkipRunner.Stub() {
             return
         }
         lastScan = now
-        NodeExtractor.extract(root, machine.activeActivity, size.x, size.y).use { tree ->
+        NodeExtractor.extract(root, machine.activeActivity, size.x, size.y,
+            surface = appWindows.inspect(root, size.x, size.y, expectedUnmapped(now))).use { tree ->
             val snapshot = tree.snapshot
-            if (snapshot.complete && snapshot.isFullScreen && root.hasOrdinaryWindow() &&
+            snapshot.freeform?.let { foreground.trackFloatingLaunch(machine.sessionId, window, it.captionId, now) }
+            if (snapshot.complete && (snapshot.isFullScreen || snapshot.freeform != null) && root.hasOrdinaryWindow() &&
                 !TargetEvidence.hasVisibleAdSignal(snapshot)
             ) {
                 foreground.rememberReturnWindow(window)
@@ -351,7 +362,7 @@ class UiAutomationRunner(private val context: Context) : ISkipRunner.Stub() {
         var hasLease = false
         val result = try {
             ActionExecutor.executeWithTap(tree, command, canDispatch = {
-                screenReady() && sameForeground(window) &&
+                screenReady() && sameForeground(tree, command.decision.targetBounds, size) &&
                     machine.isWithinWindow(SystemClock.uptimeMillis(), windowMs) &&
                     (hasLease || client.beginAction(window.packageName, tree.windowId).also { hasLease = it })
             }) { bounds -> injectTap(bounds, size) }
@@ -380,7 +391,8 @@ class UiAutomationRunner(private val context: Context) : ISkipRunner.Stub() {
         }
         val dispatchedAt = SystemClock.uptimeMillis()
         val attempt = Verification(command, window, evidence, dispatchedAt, result.actualMethod,
-            foreground.returnWindowFor(window, result.inputStartedAtMs ?: dispatchedAt))
+            evidence.freeform?.let { foreground.floatingDestination(command.sessionId, window, it.captionId) }
+                ?: foreground.returnWindowFor(window, result.inputStartedAtMs ?: dispatchedAt))
         pending = attempt
         worker.postDelayed({ verify(attempt, eventAt) }, PROBE_MS)
     }
@@ -406,7 +418,7 @@ class UiAutomationRunner(private val context: Context) : ISkipRunner.Stub() {
                     attempt.crossWindowClosure.record(TargetObservation.UNOBSERVED, now)
                     if (current != attempt.window || current.packageName.isBlank()) {
                         if (current.valid && !PackagePolicy.isTransientOverlay(current.packageName, "", false) &&
-                            root.isFocusedFullscreenApp(size.x, size.y, confirmFocus = ::confirmsFocus)
+                            appWindows.inspect(root, size.x, size.y, expectedUnmapped(now)) != null
                         ) {
                             foreground.recordFocusedApplication(current)
                             foreground.observeRoot(current, now)
@@ -422,7 +434,7 @@ class UiAutomationRunner(private val context: Context) : ISkipRunner.Stub() {
                     } else {
                         val refreshBy = if (android.os.Build.VERSION.SDK_INT < 33) now + LEGACY_REFRESH_MS else null
                         NodeExtractor.extract(root, machine.activeActivity, size.x, size.y,
-                            maxNodes = MAX_VERIFY_NODES, refreshDeadlineMs = refreshBy).use { tree ->
+                            maxNodes = MAX_VERIFY_NODES, surface = appWindows.inspect(root, size.x, size.y, expectedUnmapped(now)), refreshDeadlineMs = refreshBy).use { tree ->
                             val state = attempt.evidence.observe(tree.snapshot)
                             attempt.lastObservation = state
                             if (attempt.closure.record(state, now)) {
@@ -438,7 +450,7 @@ class UiAutomationRunner(private val context: Context) : ISkipRunner.Stub() {
                     }
                 } ?: run { attempt.lastObservation = TargetObservation.UNOBSERVED }
             }
-            if (now - attempt.dispatchedAt >= VERIFY_MS) {
+            if (now - attempt.dispatchedAt >= attempt.evidence.verifyTimeoutMs) {
                 val outcome = when (attempt.lastObservation) {
                     TargetObservation.TARGET_PRESENT, TargetObservation.AD_PRESENT -> VerifyOutcome.STILL_PRESENT
                     else -> VerifyOutcome.UNOBSERVED
@@ -460,11 +472,12 @@ class UiAutomationRunner(private val context: Context) : ISkipRunner.Stub() {
         eventAt: Long,
         now: Long
     ) {
-        val returned = runCatching { automation?.windows?.showsReturnTo(attempt.window.id, current.id) == true }
+        val returned = runCatching { automation?.windows?.showsReturnTo(attempt.window.id, current.id, attempt.evidence.freeform?.captionId) == true }
             .getOrDefault(false)
         val state = if (returned) {
             val refreshBy = if (Build.VERSION.SDK_INT < 33) now + LEGACY_REFRESH_MS else null
             NodeExtractor.extract(root, "", size.x, size.y, maxNodes = MAX_VERIFY_NODES,
+                surface = appWindows.inspect(root, size.x, size.y, expectedUnmapped(now)),
                 refreshDeadlineMs = refreshBy).use { attempt.evidence.observeReturn(it.snapshot) }
         } else {
             root.recycle()
@@ -475,7 +488,7 @@ class UiAutomationRunner(private val context: Context) : ISkipRunner.Stub() {
             finish(attempt, VerifyOutcome.VERIFIED_CLOSED, eventAt)
             foreground.recordFocusedApplication(current)
             machine.onNavigationObserved(current)
-        } else if (observedAt - attempt.dispatchedAt >= TargetEvidence.RETURN_VERIFY_TIMEOUT_MS) {
+        } else if (observedAt - attempt.dispatchedAt >= attempt.evidence.returnTimeoutMs) {
             val result = if (state == TargetObservation.AD_PRESENT || state == TargetObservation.TARGET_PRESENT) {
                 VerifyOutcome.STILL_PRESENT
             } else VerifyOutcome.NAVIGATED
@@ -535,16 +548,20 @@ class UiAutomationRunner(private val context: Context) : ISkipRunner.Stub() {
         return Point().also(display::getRealSize).takeIf { it.x > 1 && it.y > 1 }
     }
 
-    private fun activeRoot(preferFocused: Boolean = false): AccessibilityNodeInfo? {
+    private fun expectedUnmapped(now: Long): ForegroundWindow? =
+        foreground.resumeWindow(now) ?: if (pending != null || machine.isWithinWindow(now, windowMs))
+            foreground.floatingOrigin(machine.sessionId) else null
+
+    private fun activeRoot(): AccessibilityNodeInfo? {
         val session = automation ?: return null
-        val unmapped = foreground.resumeWindow(SystemClock.uptimeMillis())
+        val unmapped = expectedUnmapped(SystemClock.uptimeMillis())
         val root = session.rootInActiveWindow
         if (root != null) {
             val owner = runCatching { root.window }.getOrNull()
             val type = owner?.type
             val usable = try {
                 root.windowId >= 0 && type == AccessibilityWindowInfo.TYPE_APPLICATION &&
-                    (!preferFocused || owner?.isFocusedApp() == true)
+                    owner?.isFocusedApp() == true
             } finally {
                 owner?.recycle()
             }
@@ -566,17 +583,18 @@ class UiAutomationRunner(private val context: Context) : ISkipRunner.Stub() {
     private fun identity(root: AccessibilityNodeInfo) =
         ForegroundWindow(root.packageName?.toString().orEmpty(), root.windowId)
 
-    private fun confirmsFocus(windowId: Int): Boolean =
-        automation?.windows?.withFocusedAppWindow { it.id == windowId } == true
-
-    private fun sameForeground(window: ForegroundWindow): Boolean {
-        val root = activeRoot(preferFocused = true) ?: return false
-        return try { identity(root) == window } finally { root.recycle() }
+    private fun sameForeground(tree: ExtractedTree, target: RectBounds, size: Point): Boolean {
+        val root = activeRoot() ?: return false
+        return try {
+            appWindows.canDispatch(root, size.x, size.y, expectedUnmapped(SystemClock.uptimeMillis()), tree, target)
+        } finally { root.recycle() }
     }
 
     private fun reset() {
         machine = SkipStateMachine()
         foreground = ForegroundEvents()
+        appWindows.clear()
+        floatingTaskProof.clear()
         activityHint = null
         worker.removeCallbacks(windowProbe)
         launch = null
@@ -603,7 +621,6 @@ class UiAutomationRunner(private val context: Context) : ISkipRunner.Stub() {
         const val LAB = "$APP.TestSplashActivity"
         const val PROBE_MS = 28L
         const val FIRST_TREE_RETRY_MS = 85L
-        const val VERIFY_MS = 360L
         const val LEGACY_REFRESH_MS = 90L
         const val MAX_EVENT_AGE_MS = 400L
         const val MAX_VERIFY_NODES = 400

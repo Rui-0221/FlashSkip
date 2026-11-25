@@ -45,6 +45,17 @@ object SkipMatcher {
      * the highest-scoring safe [MatchDecision], or null if nothing safe matches.
      */
     fun findBestMatch(window: WindowSnapshot, ruleIndex: RuleIndex): MatchDecision? {
+        val viewport = window.freeform
+        if (viewport != null) {
+            if (window.windowId == null || !FreeformViewport.aligned(viewport.frame, viewport.nodeRoot,
+                    window.screenWidth, window.screenHeight) || !FreeformViewport.isCaption(viewport.frame, viewport.caption) ||
+                window.nodes.firstOrNull()?.bounds != viewport.local(viewport.nodeRoot)) return null
+            return match(window.copy(screenWidth = viewport.nodeRoot.width, screenHeight = viewport.nodeRoot.height), ruleIndex)
+        }
+        return match(window, ruleIndex)
+    }
+
+    private fun match(window: WindowSnapshot, ruleIndex: RuleIndex): MatchDecision? {
         if (window.nodes.isEmpty() || window.screenWidth <= 0 || window.screenHeight <= 0) {
             return null
         }
@@ -115,6 +126,11 @@ object SkipMatcher {
 
         for (node in window.nodes) {
             if (!node.isVisibleToUser || !node.isEnabled) continue
+            if (window.freeform != null) {
+                // A fixed top margin can move a centered button into the bottom band as a task shrinks.
+                val x = node.bounds.centerX / window.screenWidth
+                if (x in 0.30f..0.70f || window.freeform.screenTarget(node.bounds) == null) continue
+            }
             val clipped = node.bounds.clippedToScreen(window.screenWidth, window.screenHeight) ?: continue
             if (!isButtonSized(clipped, window.screenWidth, window.screenHeight)) continue
             if (!isInEdgeOrCornerZone(node.bounds, window.screenWidth, window.screenHeight, rootBounds)) continue

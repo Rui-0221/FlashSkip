@@ -1,13 +1,69 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Classic theme top-bar brand seal matching the redesigned FlashSkip app icon. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="24dp"
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
+    <path android:pathData="M6.4,2 H17.6 A4.4,4.4 0 0,1 22,6.4 V17.6 A4.4,4.4 0 0,1 17.6,22 H6.4 A4.4,4.4 0 0,1 2,17.6 V6.4 A4.4,4.4 0 0,1 6.4,2 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="2"
+                android:startY="2"
+                android:endX="22"
+                android:endY="22">
+                <item android:offset="0" android:color="#FF3A2BD6" />
+                <item android:offset="0.55" android:color="#FF2453F0" />
+                <item android:offset="1" android:color="#FF0E9BF2" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path android:pathData="M6.4,2 H17.6 A4.4,4.4 0 0,1 22,6.4 V17.6 A4.4,4.4 0 0,1 17.6,22 H6.4 A4.4,4.4 0 0,1 2,17.6 V6.4 A4.4,4.4 0 0,1 6.4,2 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="radial"
+                android:centerX="7.5"
+                android:centerY="6.5"
+                android:gradientRadius="14">
+                <item android:offset="0" android:color="#33FFFFFF" />
+                <item android:offset="1" android:color="#00FFFFFF" />
+            </gradient>
+        </aapt:attr>
+    </path>
     <path
-        android:fillColor="#1D4ED8"
-        android:pathData="M5,2 H19 C20.66,2 22,3.34 22,5 V19 C22,20.66 20.66,22 19,22 H5 C3.34,22 2,20.66 2,19 V5 C2,3.34 3.34,2 5,2 Z" />
+        android:fillColor="#1AFFFFFF"
+        android:pathData="M12,6.17 a5.83,5.83 0 1,0 0,11.66 a5.83,5.83 0 1,0 0,-11.66 z" />
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M13.5,5.5 L7.5,13.5 H11.8 L10.5,18.5 L16.5,10.5 H12.2 Z" />
+        android:fillColor="#00000000"
+        android:pathData="M5.63,8.32 A7.36,7.36 0 0,1 12,4.64"
+        android:strokeWidth="1.25"
+        android:strokeColor="#40FFFFFF"
+        android:strokeLineCap="round" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M12,4.64 A7.36,7.36 0 1,1 5.63,8.32"
+        android:strokeWidth="1.25"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round" />
+    <path
+        android:fillColor="#FFFFD43B"
+        android:pathData="M5.63,7.27 a1.05,1.05 0 1,0 0,2.10 a1.05,1.05 0 1,0 0,-2.10 z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M15.15,8.50 H15.85 A0.65,0.65 0 0,1 16.50,9.15 V14.85 A0.65,0.65 0 0,1 15.85,15.50 H15.15 A0.65,0.65 0 0,1 14.50,14.85 V9.15 A0.65,0.65 0 0,1 15.15,8.50 Z" />
+    <path android:pathData="M12.25,6.75 L7.50,12.75 H10.64 L9.64,17.25 L14.00,11.25 H11.14 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="8"
+                android:startY="6.75"
+                android:endX="13.5"
+                android:endY="17.25">
+                <item android:offset="0" android:color="#FFFFF27A" />
+                <item android:offset="1" android:color="#FFFFB300" />
+            </gradient>
+        </aapt:attr>
+    </path>
 </vector>

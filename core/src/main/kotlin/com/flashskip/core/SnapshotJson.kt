@@ -13,6 +13,15 @@ object SnapshotJson {
         append("  \"screenWidth\": ").append(snapshot.screenWidth).append(",\n")
         append("  \"screenHeight\": ").append(snapshot.screenHeight).append(",\n")
         append("  \"isFullScreen\": ").append(snapshot.isFullScreen).append(",\n")
+        snapshot.freeform?.let { viewport ->
+            append("  \"windowId\": ").append(snapshot.windowId).append(",\n")
+            append("  \"freeform\": {\"frame\": ").append(rect(viewport.frame))
+            append(", \"nodeRoot\": ").append(rect(viewport.nodeRoot))
+            append(", \"captionId\": ").append(viewport.captionId)
+            append(", \"caption\": ").append(rect(viewport.caption))
+            append(", \"obstructions\": ").append(viewport.obstructions.joinToString(prefix = "[", postfix = "]") { rect(it) })
+            append("},\n")
+        }
         append("  \"nodes\": [\n")
         snapshot.nodes.forEachIndexed { i, n ->
             append("    {")
@@ -38,6 +47,8 @@ object SnapshotJson {
         append("  ]\n")
         append('}')
     }
+
+    private fun rect(bounds: RectBounds) = "[${bounds.left},${bounds.top},${bounds.right},${bounds.bottom}]"
 
     private fun quote(s: String): String = buildString {
         append('"')

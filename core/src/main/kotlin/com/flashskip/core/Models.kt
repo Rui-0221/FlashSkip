@@ -71,7 +71,9 @@ data class WindowSnapshot(
     val isFullScreen: Boolean,
     val nodes: List<NodeSnapshot>,
     val complete: Boolean = true,
-    val windowId: Int? = null
+    val windowId: Int? = null,
+    /** When present, node rectangles are relative to the verified task's logical root. */
+    val freeform: FreeformViewport? = null
 )
 
 /**

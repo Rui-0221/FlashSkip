@@ -169,7 +169,8 @@ class SkipStateMachine(
             return EvaluationResult.NoOp
         }
 
-        if (pkg != activePackage || resumeSession && launchWindowId != null && snapshot.windowId != launchWindowId) {
+        if (pkg != activePackage || snapshot.freeform != null && snapshot.windowId != launchWindowId ||
+            resumeSession && launchWindowId != null && snapshot.windowId != launchWindowId) {
             return EvaluationResult.NoOp
         }
 

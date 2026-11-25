@@ -7,6 +7,30 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ForegroundEventsTest {
+    @Test fun floatingReturnIsBoundToPreviouslyObservedResumeSessionOriginAndCaption() {
+        val events = ForegroundEvents()
+        val business = ForegroundWindow("example", 2)
+        val ad = ForegroundWindow("example", 3)
+        events.rememberReturnWindow(business)
+        events.recordFocusedApplication(ForegroundWindow("launcher", 1))
+        events.onResumeWindowHint(ad, 1000)
+        events.trackFloatingLaunch(4, ad, 5, 1100)
+        assertNull(events.returnWindowFor(ad, 5100))
+        assertEquals(business, events.floatingDestination(4, ad, 5))
+        assertNull(events.floatingDestination(7, ad, 5))
+        assertNull(events.floatingDestination(4, business, 5))
+        assertNull(events.floatingDestination(4, ad, 8))
+        events.trackFloatingLaunch(7, ad, 5, 5100)
+        assertNull(events.floatingDestination(7, ad, 5))
+    }
+    @Test fun lateBusinessWindowHintCannotReplaceNewerFocusedAdHint() {
+        val events = ForegroundEvents()
+        events.recordFocusedApplication(ForegroundWindow("launcher", 1))
+        val ad = ForegroundWindow("example", 3)
+        events.onResumeWindowHint(ad, 1000)
+        events.onResumeWindowHint(ForegroundWindow("example", 2), 980)
+        org.junit.Assert.assertEquals(ad, events.resumeWindow(1100))
+    }
     private val previous = ForegroundWindow("com.example.previous", 7)
     private val destination = ForegroundWindow("com.example.destination", 8)
 

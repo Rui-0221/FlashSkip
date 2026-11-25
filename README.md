@@ -3,13 +3,15 @@
   FlashSkip（闪跳）
 </h1>
 
-[![Version](https://img.shields.io/badge/Version-1.0.3-161616.svg)](#)
+[![Version](https://img.shields.io/badge/Version-1.1-161616.svg)](#)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.0.21-7F52FF.svg)](https://kotlinlang.org)
 [![Android](https://img.shields.io/badge/Android-8.0%2B%20(API%2026--34)-3DDC84.svg)](https://developer.android.com)
 [![Network](https://img.shields.io/badge/Network-Zero%20Permission-0A7EA4.svg)](#隐私与安全设计)
 
 **FlashSkip** 是一款基于 Android 无障碍服务（`AccessibilityService`）的事件驱动开屏广告自动跳过工具——**无需 Root、零网络权限、纯本地运行**。通过纯 Kotlin 编写的规则与状态机引擎，在极短延迟内识别并点击“跳过”按钮，同时内置多层防误触机制，防止误点全屏广告落地页或正常业务按钮。
 
+> **v1.1 更新**：新增 **侧边栏小窗（自由窗口 / Freeform）开屏自动跳过**（无障碍与 Shizuku 双引擎支持：系统装饰栏与窗口层级核验、逻辑/屏幕坐标映射、独立小窗中央列防误触保护，兼容冷启动、30 秒+热重进、熄屏 DOZE 解锁重进与拖动缩放/切回全屏，普通 `Dialog` 与移出屏幕保持零误触）；同步统一「日常简约（Classic）」顶栏品牌图标（`ic_ef_flash_seal.xml`）为新版图标；JVM 单元测试扩充至 `80 / 80`。
+>
 > **v1.0.3 更新**：修复状态栏常驻通知小图标（`ic_stat_flash.xml`）未同步更新的问题，与新版应用图标保持一致；收紧双引擎跨窗关闭证据校验，仅在输入仍处于对应热重进时段且目标窗口 ID 一致时才采信缓存业务窗，修复普通同包导流误计为 `VERIFIED_CLOSED` 的问题。
 >
 > **v1.0.2 更新**：全新重设计自适应启动图标（`AdaptiveIcon` 靛紫→电光蓝渐变底 + 被截断的开屏倒计时环 + 闪电跳过符号「⏭」，并支持 Android 13+ 单色主题图标）。
@@ -18,7 +20,12 @@
 
 ---
 
-## 核心特性（v1.0.0）
+## 核心特性（v1.1）
+
+- **全屏 + 侧边栏小窗（Freeform）双形态跳过**：
+  - 除传统全屏开屏外，现支持通过系统侧边栏以**自由窗口（小窗模式）**启动应用时自动识别并跳过开屏广告；
+  - 通过聚焦窗口、活跃状态、系统装饰栏与窗口层级校验（无障碍 `FloatingWindowLayers` + Shizuku `FloatingTaskProof`）及 Manifest 启动 Activity 主题检查，严格区分**真实小窗**与**普通应用内 `Dialog`/悬浮浮层**；
+  - 由纯 Kotlin `FreeformViewport` 负责小窗逻辑边界与物理屏幕坐标双向转换，并在小窗内单独强化中央列防误触保护与安全位移重取。
 
 - **三套前端视觉风格 & 全功能浅/深色切换**：
   - **日常简约（Classic）**：高可读性圆润白/夜卡布局，聚焦状态总览、主开关与保活进度条；
@@ -115,11 +122,14 @@
 
 ### 自动化测试与真机回归结果
 
-- **JVM 单元测试**：`68 / 68` 项全部通过（`:core` 50 项 + `:app` 18 项，0 失败 / 0 跳过）。
+- **JVM 单元测试**：`80 / 80` 项全部通过（`:core` 58 项 + `:app` 22 项，0 失败 / 0 跳过）。
 - **内置对抗靶场（[TestSplashActivity.kt](app/src/main/java/com/flashskip/TestSplashActivity.kt)）**：
-  - 原 8 项核心对抗回归（5 正向跳过 + 3 负向防误触 `neg_guide` / `neg_redpacket` / `neg_center`）在荣耀 API 36 双引擎下全数通过（`PASS = 8 / 8, FAIL = 0`）；
+  - 全屏 8 项核心对抗回归（5 正向跳过 + 3 负向防误触 `neg_guide` / `neg_redpacket` / `neg_center`）在荣耀 API 36 双引擎下全数通过（无障碍 `8 / 8`、Shizuku `8 / 8`，0 失败）；
+  - 小窗形态下 `standard` / `non_clickable` 分别通过原生点击与手势确认关闭（`VERIFIED_CLOSED`），全屏与小窗普通 `Dialog`、引导、红包及居中按钮对照均保持零输入；
   - 扩展靶场覆盖 `warm_resume`（热重进）、跨窗口关闭与同包导流（4 正例 `VERIFIED_CLOSED` + 2 导流 `NAVIGATED`，6/6 通过），以及 `marker_replaced` / `marker_late` / `retry_replaced` 等反例边界。
-- **真实第三方应用热重进实测**：后台等待 30 秒以上热重进 50 轮（无障碍 25 轮 + 独立 Shizuku 25 轮），49 轮成功执行跳过并回到业务页（1 轮因控件移动由安全保护拦截，0 误触）；真实复杂窗口下的跨窗口关闭确认耗时与回窗证据仍在持续优化中。
+- **真实第三方应用实测（含全屏热重进与侧边栏小窗）**：
+  - 后台等待 30 秒以上全屏热重进 50 轮（无障碍 25 轮 + 独立 Shizuku 25 轮），49 轮成功执行跳过并回到业务页（1 轮因控件移动由安全保护拦截，0 误触）；
+  - 荣耀 Android 16 侧边栏小窗实测覆盖多广告类型第三方应用**冷启动**（命中聚合 SDK 资源 ID）、**退后台 30 秒+热重进**（命中自绘按钮）、**熄屏 DOZE 解锁重进**（命中文本规则）、**拖动/缩放/部分移出屏幕与切回全屏**（移出屏幕 0 输入，移回后正常触发且不误触底层应用）；真实复杂窗口下的严格 `VERIFIED_CLOSED` 回窗确认仍在持续优化中。
 
 ---
 
@@ -130,9 +140,10 @@
 ```text
 core/ (纯 Kotlin JVM 模块，零 Android 依赖，支持毫秒级快照回放单测)
  ├── Models.kt            不可变节点/窗口快照模型，避免空字符串 text 遮蔽 contentDescription
+ ├── FreeformViewport.kt  自由窗口（小窗）逻辑边界与屏幕坐标转换、遮挡与安全对齐校验
  ├── PackagePolicy.kt     系统/OEM/输入法及敏感应用默认强排除；瞬态弹窗隔离
  ├── RuleIndex.kt         按包名 O(1) 索引规则库（内置主流聚合 SDK viewId 规则）
- ├── SkipMatcher.kt       三层防误触匹配器 + 摇一摇抢跑检测 + 自绘无文字跳过节点识别
+ ├── SkipMatcher.kt       三层防误触匹配器（含小窗中央列保护）+ 摇一摇抢跑检测 + 自绘跳过识别
  ├── TargetEvidence.kt    原窗口身份与广告标记复查、跨窗口关闭证据校验
  ├── ForegroundEvents.kt  热重进前台窗口提示、有界延迟补查与已观察业务窗口追踪
  ├── SkipStateMachine.kt  启动窗口期/冷却/假成功升级/跨应用防污染校验/息屏解锁重布防状态机
@@ -140,11 +151,13 @@ core/ (纯 Kotlin JVM 模块，零 Android 依赖，支持毫秒级快照回放�
 
 app/ (Android 服务、实验双引擎、保活与界面层)
  ├── SkipAdService.kt              极薄接入层：事件合并、FIFO 状态队列、多窗口扫描、Doze/解锁唤醒恢复
+ ├── a11y/ApplicationWindows.kt    统一全屏与自由窗口资格判定、Activity 主题检查与点击前遮挡复核
+ ├── a11y/FloatingWindowLayers.kt  无障碍多窗口层级与系统装饰栏配对校验
  ├── a11y/NodeExtractor.kt         单次迭代 BFS 提取快照并 100% recycle 原生节点，标记截断与子节点异常
  ├── a11y/ActionExecutor.kt        原生点击/安全手势分发、刷新复核、移动目标有限重查与阶段日志
  ├── a11y/ForegroundAccess.kt      未知类型（type=-1）焦点窗口实时一致性核验与取根
  ├── a11y/WindowTrace.kt & SkipTrace.kt  按需启用的脱敏窗口/动作阶段诊断追踪
- ├── experimental/                 可选 Shizuku 实验引擎（ExperimentalSkip / UiAutomationRunner / SkipActionGate）
+ ├── experimental/                 可选 Shizuku 实验引擎（ExperimentalSkip / UiAutomationRunner / SkipActionGate / FloatingTaskProof）
  ├── keepalive/                    PermissionHelper / KeepAliveStatus / BackgroundSettings 多品牌保活检测与直达
  ├── data/SkipLog.kt & StatsStore.kt     双文件轮转日志、本地 P50/P95 延迟统计与主题/开关持久化
  ├── ui/                           FlashTheme（三风格）、EndfieldDecorViews、MeowDecorViews、SkipSuccessToast 等

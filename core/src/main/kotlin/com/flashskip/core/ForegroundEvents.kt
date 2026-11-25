@@ -19,6 +19,7 @@ class ForegroundEvents {
     private data class ResumeSignal(
         var expected: ForegroundWindow,
         val startedAt: Long,
+        var lastHintAt: Long = startedAt,
         var nextProbe: Int = 0
     )
 
@@ -31,6 +32,9 @@ class ForegroundEvents {
     private var resumeSignal: ResumeSignal? = null
     private var unlockedAt = Long.MIN_VALUE / 2
     private val previousApplicationWindows = LinkedHashMap<String, ForegroundWindow>()
+    private data class FloatingReturn(val session: Long, val origin: ForegroundWindow, val captionId: Int,
+                                      val destination: ForegroundWindow?)
+    private var floatingReturn: FloatingReturn? = null
     private var lastSignalAtMs = Long.MIN_VALUE / 2
     private var lastSignalWindowId: Int? = null
     private val nextUnarmedCheckAtMs = AtomicLong(Long.MIN_VALUE / 2)
@@ -66,7 +70,10 @@ class ForegroundEvents {
         if (current != null && nowMs - current.startedAt < RESUME_PROBE_MS &&
             current.expected.packageName == window.packageName
         ) {
-            current.expected = window
+            if (nowMs >= current.lastHintAt) {
+                current.expected = window
+                current.lastHintAt = nowMs
+            }
             return
         }
         val previous = focusedApplication
@@ -84,6 +91,20 @@ class ForegroundEvents {
         if (resumeWindow(actionAtMs) != origin) return null
         return previousApplicationWindows[origin.packageName]?.takeIf { it != origin }
     }
+
+    /** Freeze a prior business-window identity while the same resume hint is still current. */
+    fun trackFloatingLaunch(session: Long, origin: ForegroundWindow, captionId: Int, nowMs: Long) {
+        if (floatingReturn?.let { it.session == session && it.origin == origin && it.captionId == captionId } == true) return
+        floatingReturn = if (resumeWindow(nowMs) == origin)
+            FloatingReturn(session, origin, captionId, returnWindowFor(origin, nowMs)) else null
+    }
+
+    fun floatingDestination(session: Long, origin: ForegroundWindow, captionId: Int): ForegroundWindow? =
+        floatingReturn?.takeIf { it.session == session && it.origin == origin && it.captionId == captionId }?.destination
+
+    fun floatingOrigin(session: Long): ForegroundWindow? = floatingReturn?.takeIf {
+        it.session == session && it.origin == verifiedWindow && it.origin == resumeSignal?.expected
+    }?.origin
 
     /** The adapter has observed a complete, full-screen window with no visible ad signal. */
     fun rememberReturnWindow(window: ForegroundWindow) {

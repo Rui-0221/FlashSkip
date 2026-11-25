@@ -1,6 +1,5 @@
 package com.flashskip.a11y
 
-import android.graphics.Rect
 import android.os.Build
 import android.view.Display
 import android.view.accessibility.AccessibilityEvent
@@ -13,28 +12,6 @@ internal fun AccessibilityEvent.mayChangeForeground(): Boolean {
     val changes = AccessibilityEvent.WINDOWS_CHANGE_ACTIVE or AccessibilityEvent.WINDOWS_CHANGE_FOCUSED or
         AccessibilityEvent.WINDOWS_CHANGE_ADDED or AccessibilityEvent.WINDOWS_CHANGE_REMOVED
     return windowChanges and changes != 0
-}
-
-internal fun AccessibilityNodeInfo.isFocusedFullscreenApp(
-    screenWidth: Int,
-    screenHeight: Int,
-    unmappedWindow: ForegroundWindow? = null,
-    confirmFocus: (Int) -> Boolean
-): Boolean {
-    if (!isVisibleToUser) return false
-    val bounds = Rect().also(::getBoundsInScreen)
-    if (!bounds.intersect(0, 0, screenWidth, screenHeight) ||
-        bounds.width() < screenWidth * 0.85f || bounds.height() < screenHeight * 0.85f
-    ) return false
-    val owner = runCatching { window }.getOrNull()
-        ?: return runCatching { confirmFocus(windowId) }.getOrDefault(false)
-    return try {
-        owner.id == windowId && (owner.isFocusedApp() ||
-            owner.isFocusedUnmapped(unmappedWindow?.id) && packageName?.toString() == unmappedWindow?.packageName)
-    } finally {
-        @Suppress("DEPRECATION")
-        owner.recycle()
-    }
 }
 
 internal fun AccessibilityWindowInfo.isFocusedApp(): Boolean =
@@ -73,11 +50,11 @@ internal fun AccessibilityNodeInfo.hasOrdinaryWindow(): Boolean {
 }
 
 @Suppress("DEPRECATION")
-internal fun List<AccessibilityWindowInfo>.showsReturnTo(originId: Int, destinationId: Int): Boolean {
+internal fun List<AccessibilityWindowInfo>.showsReturnTo(originId: Int, destinationId: Int, captionId: Int? = null): Boolean {
     return try {
         withFocusedAppWindow { focused ->
             focused.id == destinationId && none { window ->
-                window.id == originId || window.layer > focused.layer &&
+                window.id == originId || window.id != captionId && window.layer > focused.layer &&
                     (window.type == AccessibilityWindowInfo.TYPE_APPLICATION || window.type == -1)
             }
         } == true

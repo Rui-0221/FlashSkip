@@ -11,6 +11,7 @@ import com.flashskip.core.ActionCommand
 import com.flashskip.core.ClickMethod
 import com.flashskip.core.RectBounds
 import com.flashskip.core.TargetEvidence
+import com.flashskip.core.containsCenter
 import com.flashskip.core.sameControlIdentity
 
 /**
@@ -37,12 +38,15 @@ object ActionExecutor {
         tree: ExtractedTree,
         command: ActionCommand
     ): TargetEvidence? {
+        val snapshot = tree.snapshot
+        val floatingForegroundRecheck = snapshot.freeform != null && result.rejectedBy == Rejection.FOREGROUND_CHANGED
         if (result.dispatched || result.inputStartedAtMs != null || command.preferredMethod != ClickMethod.GESTURE ||
             command.attemptNumber != 1 ||
-            (result.rejectedBy != Rejection.TARGET_UNAVAILABLE && result.rejectedBy != Rejection.TARGET_MOVED)
+            (result.rejectedBy != Rejection.TARGET_UNAVAILABLE && result.rejectedBy != Rejection.TARGET_MOVED &&
+                !floatingForegroundRecheck)
         ) return null
-        val snapshot = tree.snapshot
-        val evidence = TargetEvidence(snapshot, command.decision, allowBoundedMovement = result.rejectedBy == Rejection.TARGET_MOVED)
+        val evidence = TargetEvidence(snapshot, command.decision,
+            allowBoundedMovement = result.rejectedBy == Rejection.TARGET_MOVED || floatingForegroundRecheck)
         return evidence.takeIf { it.matches(snapshot.nodes[command.decision.targetNodeIndex]) }
     }
 
@@ -73,6 +77,22 @@ object ActionExecutor {
 
         if (command.preferredMethod == ClickMethod.NODE_ACTION) {
             val clickNode = tree.nodeAt(decision.clickNodeIndex)
+            val viewport = tree.snapshot.freeform
+            if (viewport != null) {
+                for (index in setOf(decision.targetNodeIndex, decision.clickNodeIndex)) {
+                    val live = tree.nodeAt(index)
+                    if (live == null || !runCatching { live.refresh() }.getOrDefault(false)) {
+                        return ExecutionResult(false, ClickMethod.NODE_ACTION, Rejection.TARGET_UNAVAILABLE)
+                    }
+                    val original = tree.snapshot.nodes[index]
+                    val current = tree.currentTarget(index, live, Rect().also(live::getBoundsInScreen))
+                    if (live.windowId != tree.windowId || live.packageName?.toString() != command.packageName ||
+                        !live.isVisibleToUser || !live.isEnabled || !current.sameControlIdentity(original) ||
+                        current.bounds != original.bounds || viewport.screenTarget(current.bounds) == null) {
+                        return ExecutionResult(false, ClickMethod.NODE_ACTION, Rejection.TARGET_IDENTITY_CHANGED)
+                    }
+                }
+            }
             if (clickNode != null && (clickNode.windowId != tree.windowId ||
                     clickNode.packageName?.toString() != command.packageName)
             ) {
@@ -123,16 +143,19 @@ object ActionExecutor {
             !currentTarget.isVisibleToUser || !currentTarget.isEnabled -> Rejection.TARGET_INACTIVE
             originalTarget.viewId.isBlank() && originalTarget.effectiveText.isBlank() &&
                 currentTarget.bounds != originalTarget.bounds -> Rejection.TARGET_IDENTITY_CHANGED
-            !bounds.contains(decision.targetBounds.centerX.toInt(), decision.targetBounds.centerY.toInt()) ->
+            !currentTarget.bounds.containsCenter(decision.targetBounds) ->
                 Rejection.TARGET_MOVED
-            retry != null && !retry.matches(currentTarget) -> Rejection.RETRY_TARGET_CHANGED
+            retry != null && !retry.matches(currentTarget, tree.snapshot.freeform) -> Rejection.RETRY_TARGET_CHANGED
             else -> null
         }
         if (rejection != null) return ExecutionResult(false, ClickMethod.GESTURE, rejection)
         if (!canDispatch()) {
             return ExecutionResult(false, ClickMethod.GESTURE, Rejection.FOREGROUND_CHANGED)
         }
-        return tap(decision.targetBounds)
+        val viewport = tree.snapshot.freeform
+        val physical = if (viewport == null) decision.targetBounds else viewport.screenTarget(decision.targetBounds)
+            ?: return ExecutionResult(false, ClickMethod.GESTURE, Rejection.TARGET_OUTSIDE_SCREEN)
+        return tap(physical)
     }
 
     private fun dispatchClampedTap(

@@ -31,6 +31,9 @@ class TargetEvidence(
 ) {
     private val packageName = snapshot.packageName
     private val windowId = snapshot.windowId
+    val freeform = snapshot.freeform
+    val returnTimeoutMs = if (freeform == null) RETURN_VERIFY_TIMEOUT_MS else 1800L
+    val verifyTimeoutMs = if (freeform == null) 360L else 1500L
     private val target = snapshot.nodes[decision.targetNodeIndex]
     private val targetLabel = stableSkipLabel(target.effectiveText)
     private val originalMarkers = snapshot.nodes.filter {
@@ -41,13 +44,23 @@ class TargetEvidence(
     fun matchesWindow(pkg: String, id: Int?): Boolean =
         windowId != null && pkg == packageName && id == windowId
 
-    fun matches(node: NodeSnapshot): Boolean =
-        isIdentifiedTarget(node) && (target.bounds == node.bounds ||
-            allowBoundedMovement && target.viewId.isNotBlank() && isNearby(node.bounds))
+    fun matches(node: NodeSnapshot, viewport: FreeformViewport? = freeform): Boolean {
+        if (!isIdentifiedTarget(node)) return false
+        if (freeform != null && !freeform.sameTask(viewport)) return false
+        val original = clickBounds(target.bounds, freeform) ?: return false
+        val candidate = clickBounds(node.bounds, viewport) ?: return false
+        return original == candidate || allowBoundedMovement && target.viewId.isNotBlank() && isNearby(original, candidate)
+    }
 
     fun allowsRetry(snapshot: WindowSnapshot, node: NodeSnapshot): Boolean =
-        matches(node) && (target.bounds == node.bounds || snapshot.complete) &&
-            snapshot.nodes.count { if (allowBoundedMovement) isIdentifiedTarget(it) else matches(it) } == 1
+        sameSurface(snapshot) && matches(node, snapshot.freeform) &&
+            (target.bounds == node.bounds && freeform?.nodeRoot == snapshot.freeform?.nodeRoot || snapshot.complete) &&
+            snapshot.nodes.count {
+                if (allowBoundedMovement) isIdentifiedTarget(it) else matches(it, snapshot.freeform)
+            } == 1
+
+    private fun clickBounds(bounds: RectBounds, viewport: FreeformViewport?): RectBounds? =
+        if (viewport == null) bounds else viewport.screenTarget(bounds)
 
     private fun isIdentifiedTarget(node: NodeSnapshot): Boolean =
         node.isVisibleToUser && node.isEnabled && target.className.isNotBlank() &&
@@ -56,15 +69,15 @@ class TargetEvidence(
             if (targetLabel != null) stableSkipLabel(node.effectiveText) == targetLabel
             else target.effectiveText == node.effectiveText
 
-    private fun isNearby(bounds: RectBounds): Boolean =
-        bounds.width.toDouble() in (target.bounds.width * 0.8)..(target.bounds.width * 1.25) &&
-            bounds.height.toDouble() in (target.bounds.height * 0.8)..(target.bounds.height * 1.25) &&
-            abs(bounds.centerX - target.bounds.centerX) <= minOf(bounds.width, target.bounds.width) * 0.75 &&
-            abs(bounds.centerY - target.bounds.centerY) <= minOf(bounds.height, target.bounds.height) * 0.75
+    private fun isNearby(original: RectBounds, bounds: RectBounds): Boolean =
+        bounds.width.toDouble() in (original.width * 0.8)..(original.width * 1.25) &&
+            bounds.height.toDouble() in (original.height * 0.8)..(original.height * 1.25) &&
+            abs(bounds.centerX - original.centerX) <= minOf(bounds.width, original.width) * 0.75 &&
+            abs(bounds.centerY - original.centerY) <= minOf(bounds.height, original.height) * 0.75
 
     fun observe(snapshot: WindowSnapshot): TargetObservation {
         val root = snapshot.nodes.firstOrNull()
-        if (snapshot.packageName != packageName || snapshot.windowId != windowId ||
+        if (snapshot.packageName != packageName || snapshot.windowId != windowId || !sameSurface(snapshot) ||
             root == null || !root.isVisibleToUser || root.bounds.isEmpty
         ) {
             return TargetObservation.UNOBSERVED
@@ -74,12 +87,16 @@ class TargetEvidence(
     }
 
     fun observeReturn(snapshot: WindowSnapshot): TargetObservation {
-        if (snapshot.packageName != packageName || snapshot.windowId == windowId || !snapshot.isFullScreen ||
+        if (snapshot.packageName != packageName || snapshot.windowId == windowId || !sameSurface(snapshot) ||
+            (!snapshot.isFullScreen && snapshot.freeform == null) ||
             snapshot.nodes.firstOrNull()?.isVisibleToUser != true
         ) return TargetObservation.UNOBSERVED
         if (hasVisibleAdSignal(snapshot)) return TargetObservation.AD_PRESENT
         return if (snapshot.complete) TargetObservation.ABSENT else TargetObservation.UNOBSERVED
     }
+
+    private fun sameSurface(snapshot: WindowSnapshot) =
+        if (freeform == null) snapshot.freeform == null else freeform.sameTask(snapshot.freeform)
 
     private fun observeNodes(snapshot: WindowSnapshot): TargetObservation {
         var adStillVisible = false

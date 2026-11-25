@@ -27,7 +27,7 @@ class ExtractedTree(
             viewId = node.viewIdResourceName.orEmpty(),
             text = node.text?.toString().orEmpty(),
             contentDescription = node.contentDescription?.toString().orEmpty(),
-            bounds = RectBounds(bounds.left, bounds.top, bounds.right, bounds.bottom),
+            bounds = snapshot.freeform?.local(bounds.bounds()) ?: bounds.bounds(),
             isVisibleToUser = node.isVisibleToUser,
             isEnabled = node.isEnabled
         )
@@ -46,13 +46,14 @@ object NodeExtractor {
      * Extracts [root] iteratively. Ownership of [root] is transferred to the returned
      * [ExtractedTree] — callers MUST invoke [ExtractedTree.close] in a `use` block.
      */
-    fun extract(
+    internal fun extract(
         root: AccessibilityNodeInfo,
         activityName: String,
         screenWidth: Int,
         screenHeight: Int,
         maxNodes: Int = MAX_NODES,
-        refreshDeadlineMs: Long? = null
+        refreshDeadlineMs: Long? = null,
+        surface: AppSurface? = AppSurface()
     ): ExtractedTree {
         val snapshots = ArrayList<NodeSnapshot>(128)
         val natives = ArrayList<AccessibilityNodeInfo>(128)
@@ -65,6 +66,12 @@ object NodeExtractor {
 
         try {
             val pkg = root.packageName?.toString().orEmpty()
+            if (surface == null) {
+                queue.clear()
+                natives.add(root)
+                return ExtractedTree(WindowSnapshot(pkg, activityName, screenWidth, screenHeight, false,
+                    emptyList(), complete = false, windowId = root.windowId), natives)
+            }
             while (queue.isNotEmpty() && snapshots.size < maxNodes) {
                 val item = queue.removeFirst()
                 val node = item.node
@@ -79,8 +86,8 @@ object NodeExtractor {
                 natives.add(node)
 
                 node.getBoundsInScreen(rect)
-                val bounds = RectBounds(rect.left, rect.top, rect.right, rect.bottom)
-                if (idx == 0 && screenWidth > 0 && screenHeight > 0) {
+                val bounds = surface.freeform?.local(rect.bounds()) ?: rect.bounds()
+                if (idx == 0 && surface.freeform == null && screenWidth > 0 && screenHeight > 0) {
                     rootFullScreen = bounds.width >= screenWidth * 0.85f &&
                         bounds.height >= screenHeight * 0.85f
                 }
@@ -128,7 +135,8 @@ object NodeExtractor {
                 isFullScreen = rootFullScreen,
                 nodes = snapshots,
                 complete = complete && queue.isEmpty(),
-                windowId = root.windowId.takeIf { it >= 0 }
+                windowId = root.windowId.takeIf { it >= 0 },
+                freeform = surface.freeform
             )
             return ExtractedTree(win, natives)
         } catch (e: Exception) {
