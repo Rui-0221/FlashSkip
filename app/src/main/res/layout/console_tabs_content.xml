@@ -495,10 +495,19 @@
             </com.flashskip.ui.EfWrapLayout>
 
             <com.flashskip.ui.EfButton
-                android:id="@+id/btnGoKeepAlive"
+                android:id="@+id/btnHomeConfigCheck"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="14dp"
+                android:text="一键配置体检"
+                android:textSize="14.5sp"
+                app:efKind="go" />
+
+            <com.flashskip.ui.EfButton
+                android:id="@+id/btnGoKeepAlive"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
                 android:text="确保它在后台稳定运行（查看向导）"
                 android:textSize="14.5sp"
                 app:efKind="normal" />
@@ -715,6 +724,15 @@
             android:text="手机锁屏或放几个小时后，系统常会把后台软件清理掉。把下面 4 项逐一设为开启或允许，闪跳就能整天稳稳工作。"
             android:textColor="@color/ef_ink_2"
             android:textSize="14sp" />
+
+        <com.flashskip.ui.EfButton
+            android:id="@+id/btnKaConfigCheck"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="一键深度体检（核验真实状态）"
+            android:textSize="14.5sp"
+            app:efKind="go" />
 
         <!-- 4-Step Interactive Checklist Card -->
         <LinearLayout
@@ -974,6 +992,16 @@
                 android:text="去打开手机后台保活设置"
                 android:textSize="15sp"
                 app:efKind="go" />
+
+            <com.flashskip.ui.EfButton
+                android:id="@+id/btnOemConfirm"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="我已在系统页开启自启（标记已核对）"
+                android:textSize="13.5sp"
+                app:efKind="normal"
+                app:efSmall="true" />
 
             <LinearLayout
                 android:id="@+id/kaJumpFeedbackBanner"

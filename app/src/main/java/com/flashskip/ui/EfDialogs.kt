@@ -492,6 +492,313 @@ object EfDialogs {
         return dialog
     }
 
+    fun showConfigAuditDialog(
+        activity: Activity,
+        report: ConsoleFormatter.ConfigAuditReport,
+        copy: ConsoleFormatter.ThemeActionCopy,
+        onAction: (ConsoleFormatter.AuditAction) -> Unit
+    ): AlertDialog {
+        val density = activity.resources.displayMetrics.density
+        val endfield = FlashTheme.isEndfield(activity)
+        val meow = FlashTheme.isMeow(activity)
+        val p = FlashTheme.palette(activity)
+        val pad = (20f * density).toInt()
+        val extraCutClearance = if (endfield) (8f * density).toInt() else 0
+        val topPad = when {
+            endfield -> (22f * density).toInt()
+            meow -> (28f * density).toInt()
+            else -> pad
+        }
+        val hairlinePx = (1f * density).toInt().coerceAtLeast(1)
+
+        val root = buildDialogFrame(activity)
+        val content = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(pad, topPad, pad, pad + extraCutClearance)
+        }
+        if (endfield) {
+            content.addView(makeEndfieldEyebrow(activity, "// ${copy.dialogEyebrow}", p))
+        } else {
+            content.addView(makeSubtitleTag(activity, copy.dialogEyebrow, p))
+        }
+        content.addView(makeTitle(activity, copy.dialogTitle, p))
+
+        // Summary box styled per active theme
+        val summaryBox = LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            when {
+                endfield -> {
+                    background = EfCutDrawable.buildSquareBox(p.panelSubtle, p.rule, hairlinePx)
+                    setPadding(0, 0, (12f * density).toInt(), 0)
+                }
+                meow -> {
+                    background = GradientDrawable().apply {
+                        shape = GradientDrawable.RECTANGLE
+                        cornerRadius = 16f * density
+                        setColor(p.panelSubtle)
+                        setStroke(hairlinePx, p.rule)
+                    }
+                    val p12 = (12f * density).toInt()
+                    setPadding(p12, p12, p12, p12)
+                }
+                else -> {
+                    setBackgroundResource(R.drawable.fs_tile_bg)
+                    val p12 = (12f * density).toInt()
+                    setPadding(p12, p12, p12, p12)
+                }
+            }
+        }
+        if (endfield) {
+            val accent = View(activity).apply { setBackgroundColor(p.signal) }
+            summaryBox.addView(accent, LinearLayout.LayoutParams(
+                (5f * density).toInt(),
+                ViewGroup.LayoutParams.MATCH_PARENT
+            ).apply { marginEnd = (10f * density).toInt() })
+        }
+        val summaryCol = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            if (endfield) {
+                val pV = (10f * density).toInt()
+                setPadding(0, pV, 0, pV)
+            }
+        }
+        val summaryTitle = TextView(activity).apply {
+            text = "${report.passedCount} / ${report.totalCount} 项通过 · ${report.headline}"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(p.ink)
+        }
+        val summaryBody = TextView(activity).apply {
+            text = report.summary
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12.5f)
+            setTextColor(p.ink2)
+            setLineSpacing(0f, 1.4f)
+            setPadding(0, (3f * density).toInt(), 0, 0)
+        }
+        summaryCol.addView(summaryTitle)
+        summaryCol.addView(summaryBody)
+        summaryBox.addView(summaryCol, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        content.addView(summaryBox, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply {
+            topMargin = (10f * density).toInt()
+            bottomMargin = (10f * density).toInt()
+        })
+
+        val scroll = ScrollView(activity)
+        val list = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL }
+        lateinit var dialog: AlertDialog
+
+        report.items.forEachIndexed { idx, item ->
+            val itemBox = LinearLayout(activity).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(0, (8f * density).toInt(), 0, (8f * density).toInt())
+            }
+            val headerRow = EfWrapLayout(activity)
+
+            val indexTag = TextView(activity).apply {
+                text = item.indexLabel
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 11.5f)
+                setTextColor(p.tagFg)
+                if (endfield) {
+                    EfTypeface.applyField(this, bold = true)
+                    background = EfCutDrawable.build(
+                        fillColor = p.tagBg,
+                        cutBottomRightPx = 6f * density,
+                        useCutCorners = true
+                    )
+                    setPadding((7f * density).toInt(), (2f * density).toInt(), (10f * density).toInt(), (2f * density).toInt())
+                } else {
+                    setTypeface(typeface, Typeface.BOLD)
+                    background = GradientDrawable().apply {
+                        shape = GradientDrawable.RECTANGLE
+                        cornerRadius = 999f * density
+                        setColor(p.tagBg)
+                    }
+                    setPadding((8f * density).toInt(), (2f * density).toInt(), (8f * density).toInt(), (2f * density).toInt())
+                }
+            }
+            val titleView = TextView(activity).apply {
+                text = item.title
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 14.5f)
+                setTypeface(typeface, Typeface.BOLD)
+                setTextColor(p.ink)
+            }
+            val badgeView = TextView(activity).apply {
+                text = item.statusLabel
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 11.5f)
+                setTypeface(typeface, Typeface.BOLD)
+                applyAuditBadgeStyle(this, item.status, p, endfield, meow, density, hairlinePx)
+            }
+
+            headerRow.addView(indexTag)
+            headerRow.addView(titleView)
+            headerRow.addView(badgeView)
+            itemBox.addView(headerRow)
+
+            val detailView = TextView(activity).apply {
+                text = item.detail
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+                setTextColor(p.ink2)
+                setLineSpacing(0f, 1.42f)
+                setPadding(0, (6f * density).toInt(), 0, 0)
+            }
+            itemBox.addView(detailView)
+
+            if (item.primaryAction != null && item.primaryActionLabel != null) {
+                val btnRow = EfWrapLayout(activity)
+                val pBtn = makeAuditChipButton(
+                    activity = activity,
+                    label = item.primaryActionLabel,
+                    kind = if (item.status != ConsoleFormatter.AuditItemStatus.PASS) EfButton.Kind.GO else EfButton.Kind.NORMAL,
+                    density = density
+                ) {
+                    dialog.dismiss()
+                    onAction(item.primaryAction)
+                }
+                btnRow.addView(pBtn)
+
+                if (item.secondaryAction != null && item.secondaryActionLabel != null) {
+                    val sBtn = makeAuditChipButton(
+                        activity = activity,
+                        label = item.secondaryActionLabel,
+                        kind = EfButton.Kind.NORMAL,
+                        density = density
+                    ) {
+                        dialog.dismiss()
+                        onAction(item.secondaryAction)
+                    }
+                    btnRow.addView(sBtn)
+                }
+                itemBox.addView(btnRow, LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                ).apply { topMargin = (8f * density).toInt() })
+            }
+
+            list.addView(itemBox)
+
+            if (idx < report.items.lastIndex) {
+                val divider = View(activity)
+                if (meow) {
+                    divider.background = MeowDividerDrawable(p.rule, p.signal, density)
+                    list.addView(divider, LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        (10f * density).toInt().coerceAtLeast(1)
+                    ))
+                } else {
+                    divider.setBackgroundColor(p.rule)
+                    list.addView(divider, LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        hairlinePx
+                    ))
+                }
+            }
+        }
+        scroll.addView(list)
+        val maxScrollH = (activity.resources.displayMetrics.heightPixels * 0.48f).toInt()
+            .coerceAtLeast((240f * density).toInt())
+        content.addView(scroll, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            maxScrollH
+        ).apply { bottomMargin = (14f * density).toInt() })
+
+        val footer = EfWrapLayout(activity).apply {
+            if (endfield) setPadding(0, 0, (6f * density).toInt(), 0)
+        }
+        val btnLiveTest = EfButton(activity).apply {
+            text = copy.liveTestLabel
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13.5f)
+            setEfKind(if (report.canRunLiveTest) EfButton.Kind.GO else EfButton.Kind.NORMAL)
+            setOnClickListener {
+                dialog.dismiss()
+                onAction(ConsoleFormatter.AuditAction.RUN_LIVE_TEST)
+            }
+        }
+        val btnClose = EfButton(activity).apply {
+            text = copy.closeLabel
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13.5f)
+            setEfKind(EfButton.Kind.NORMAL)
+            setOnClickListener { dialog.dismiss() }
+        }
+        footer.addView(btnLiveTest)
+        footer.addView(btnClose)
+        content.addView(footer)
+        root.addView(content)
+
+        dialog = AlertDialog.Builder(activity).setView(root).create()
+        dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+        dialog.show()
+        return dialog
+    }
+
+    private fun makeAuditChipButton(
+        activity: Activity,
+        label: String,
+        kind: EfButton.Kind,
+        density: Float,
+        onClick: () -> Unit
+    ): EfButton = EfButton(activity).apply {
+        text = label
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, 12.5f)
+        setEfKind(kind)
+        val pH = (12f * density).toInt()
+        val pV = (6f * density).toInt()
+        setPadding(pH, pV, pH, pV)
+        minHeight = (38f * density).toInt()
+        minimumHeight = minHeight
+        setOnClickListener { onClick() }
+    }
+
+    private fun applyAuditBadgeStyle(
+        view: TextView,
+        status: ConsoleFormatter.AuditItemStatus,
+        p: FlashTheme.Palette,
+        endfield: Boolean,
+        meow: Boolean,
+        density: Float,
+        strokePx: Int
+    ) {
+        val (bg, fg, st) = when (status) {
+            ConsoleFormatter.AuditItemStatus.PASS -> Triple(p.statusOkBg, p.statusOkFg, p.statusOkStroke)
+            ConsoleFormatter.AuditItemStatus.WARN -> Triple(p.statusWarnBg, p.statusWarnFg, p.statusWarnStroke)
+            ConsoleFormatter.AuditItemStatus.FAIL -> Triple(p.statusAlertBg, p.statusAlertFg, p.statusAlertStroke)
+        }
+        view.setTextColor(fg)
+        val pH = (9f * density).toInt()
+        val pV = (3f * density).toInt()
+        when {
+            endfield -> {
+                view.background = when (status) {
+                    ConsoleFormatter.AuditItemStatus.PASS -> EfCutDrawable.buildSquareBox(bg, st, strokePx)
+                    ConsoleFormatter.AuditItemStatus.WARN -> EfCutDrawable.buildSquareBox(bg, st, strokePx, dashed = true, dashWidthPx = 4f * density, dashGapPx = 3f * density)
+                    ConsoleFormatter.AuditItemStatus.FAIL -> EfCutDrawable.build(bg, cutBottomRightPx = 6f * density, useCutCorners = true)
+                }
+                view.setPadding(pH, pV, (if (status == ConsoleFormatter.AuditItemStatus.FAIL) 11f * density else 9f * density).toInt(), pV)
+            }
+            meow -> {
+                view.background = GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE
+                    cornerRadius = 999f * density
+                    setColor(bg)
+                    if (st != null) setStroke(strokePx, st)
+                }
+                view.setPadding(pH, pV, pH, pV)
+            }
+            else -> {
+                view.background = GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE
+                    cornerRadius = 8f * density
+                    setColor(bg)
+                    if (st != null) setStroke(strokePx, st)
+                }
+                view.setPadding(pH, pV, pH, pV)
+            }
+        }
+    }
+
     fun showDarkToast(host: FrameLayout, message: String, bottomOffsetPx: Int = 0) {
         toastHandler.removeCallbacksAndMessages(null)
         activeToast?.let { host.removeView(it) }

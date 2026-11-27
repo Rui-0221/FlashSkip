@@ -16,7 +16,10 @@ class KeepAliveStatusTest {
         foregroundActive = true,
         batteryExempt = true,
         backgroundRestricted = false,
-        notificationsVisible = true
+        notificationsVisible = true,
+        notificationPermissionGranted = true,
+        notificationChannelReady = true,
+        oemKeepAliveConfirmed = true
     )
 
     @Test
@@ -24,6 +27,26 @@ class KeepAliveStatusTest {
         assertEquals(KeepAliveState.PAUSED, active.copy(masterEnabled = false).state)
         assertEquals(KeepAliveState.NEEDS_ACCESSIBILITY, active.copy(accessibilityEnabled = false).state)
         assertEquals(KeepAliveState.CONNECTING, active.copy(accessibilityConnected = false).state)
+    }
+
+    @Test
+    fun notificationsReadyAndBackgroundReadyRejectFakeGreens() {
+        assertTrue(active.notificationsReady)
+        assertTrue(active.backgroundReady)
+        assertTrue(active.isKeepAliveHealthy)
+
+        // Connected + enabled, but runtime notification permission or channel or foreground service missing
+        assertFalse(active.copy(notificationPermissionGranted = false).notificationsReady)
+        assertFalse(active.copy(notificationChannelReady = false).notificationsReady)
+        assertFalse(active.copy(foregroundActive = false).notificationsReady)
+        assertFalse(active.copy(foregroundActive = false).isKeepAliveHealthy)
+
+        // When accessibility is not connected yet, notification permission alone is allowed
+        assertTrue(active.copy(accessibilityConnected = false, foregroundActive = false).notificationsReady)
+
+        // Native backgroundRestricted == false alone cannot pass backgroundReady without OEM confirmation
+        assertFalse(active.copy(oemKeepAliveConfirmed = false).backgroundReady)
+        assertFalse(active.copy(oemKeepAliveConfirmed = false).isKeepAliveHealthy)
     }
 
     @Test

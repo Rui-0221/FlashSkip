@@ -1,5 +1,6 @@
 package com.flashskip.keepalive
 
+import android.Manifest
 import android.app.Activity
 import android.app.ActivityManager
 import android.app.NotificationManager
@@ -7,10 +8,12 @@ import android.content.ActivityNotFoundException
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
+import androidx.core.content.ContextCompat
 import com.flashskip.SkipAdService
 import com.flashskip.data.StatsStore
 
@@ -19,20 +22,33 @@ import com.flashskip.data.StatsStore
  */
 object PermissionHelper {
 
-    fun readStatus(context: Context) = KeepAliveStatus(
-        masterEnabled = StatsStore(context).masterEnabled,
-        accessibilityEnabled = isAccessibilityEnabledInSettings(context),
-        accessibilityConnected = SkipAdService.connected,
-        foregroundActive = SkipAdService.foregroundActive,
-        batteryExempt = isIgnoringBatteryOptimizations(context),
-        backgroundRestricted = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P &&
-            context.getSystemService(ActivityManager::class.java)?.isBackgroundRestricted == true,
-        notificationsVisible = context.getSystemService(NotificationManager::class.java)?.let { manager ->
-            manager.areNotificationsEnabled() &&
-                manager.getNotificationChannel(SkipAdService.NOTIFICATION_CHANNEL_ID)?.importance !=
-                NotificationManager.IMPORTANCE_NONE
+    fun readStatus(context: Context): KeepAliveStatus {
+        val store = StatsStore(context)
+        val notifPermGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+        val manager = context.getSystemService(NotificationManager::class.java)
+        val channel = manager?.getNotificationChannel(SkipAdService.NOTIFICATION_CHANNEL_ID)
+        val channelReady = channel != null && channel.importance != NotificationManager.IMPORTANCE_NONE
+        val notifVisible = notifPermGranted && manager?.let {
+            it.areNotificationsEnabled() &&
+                (channel == null || channel.importance != NotificationManager.IMPORTANCE_NONE)
         } == true
-    )
+
+        return KeepAliveStatus(
+            masterEnabled = store.masterEnabled,
+            accessibilityEnabled = isAccessibilityEnabledInSettings(context),
+            accessibilityConnected = SkipAdService.connected,
+            foregroundActive = SkipAdService.foregroundActive,
+            batteryExempt = isIgnoringBatteryOptimizations(context),
+            backgroundRestricted = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P &&
+                context.getSystemService(ActivityManager::class.java)?.isBackgroundRestricted == true,
+            notificationsVisible = notifVisible,
+            notificationPermissionGranted = notifPermGranted,
+            notificationChannelReady = channelReady,
+            oemKeepAliveConfirmed = store.oemKeepAliveConfirmed
+        )
+    }
 
     /**
      * Accurately checks whether [SkipAdService] is enabled in system settings by parsing

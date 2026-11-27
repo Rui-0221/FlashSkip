@@ -184,7 +184,10 @@ class ConsoleFormatterTest {
             foregroundActive = true,
             batteryExempt = true,
             backgroundRestricted = false,
-            notificationsVisible = true
+            notificationsVisible = true,
+            notificationPermissionGranted = true,
+            notificationChannelReady = true,
+            oemKeepAliveConfirmed = true
         )
 
         val needsA11y = ConsoleFormatter.formatHomeHero(healthy.copy(accessibilityEnabled = false), false)
@@ -228,7 +231,10 @@ class ConsoleFormatterTest {
             foregroundActive = true,
             batteryExempt = false,
             backgroundRestricted = false,
-            notificationsVisible = true
+            notificationsVisible = true,
+            notificationPermissionGranted = true,
+            notificationChannelReady = true,
+            oemKeepAliveConfirmed = true
         )
         val r4 = ConsoleFormatter.computeKeepAliveReadiness4(status)
         assertEquals(3, r4.readyCount)
@@ -305,7 +311,10 @@ class ConsoleFormatterTest {
             foregroundActive = true,
             batteryExempt = true,
             backgroundRestricted = false,
-            notificationsVisible = true
+            notificationsVisible = true,
+            notificationPermissionGranted = true,
+            notificationChannelReady = true,
+            oemKeepAliveConfirmed = true
         )
 
         val catNeedPerm = ConsoleFormatter.formatMeowCat(healthy.copy(accessibilityEnabled = false), false, 0)
@@ -340,6 +349,19 @@ class ConsoleFormatterTest {
         val catNoNotif = ConsoleFormatter.formatMeowCat(healthy.copy(notificationsVisible = false), false, 0)
         assertEquals(ConsoleFormatter.MeowCatPose.SLEEPING, catNoNotif.pose)
         assertFalse(catNoNotif.isAwake)
+
+        val unconfirmedOem = healthy.copy(oemKeepAliveConfirmed = false)
+        val catUnconfirmedOem = ConsoleFormatter.formatMeowCat(unconfirmedOem, false, 0)
+        assertEquals(ConsoleFormatter.MeowCatPose.SLEEPING, catUnconfirmedOem.pose)
+        assertFalse(catUnconfirmedOem.isAwake)
+        assertFalse(ConsoleFormatter.isCatAwakeReady(unconfirmedOem, observeOnly = false))
+        val hudUnconfirmedOem = ConsoleFormatter.formatEndfieldHud(unconfirmedOem, observeOnly = false)
+        assertEquals("GUARD", hudUnconfirmedOem.statusCode)
+        assertFalse(hudUnconfirmedOem.syncPercent == 100)
+
+        val missingFgNotif = healthy.copy(foregroundActive = false)
+        assertFalse(ConsoleFormatter.isCatAwakeReady(missingFgNotif, observeOnly = false))
+        assertEquals("GUARD", ConsoleFormatter.formatEndfieldHud(missingFgNotif, observeOnly = false).statusCode)
 
         assertTrue(ConsoleFormatter.isCatAwakeReady(healthy, observeOnly = false))
         assertFalse(ConsoleFormatter.isCatAwakeReady(healthy.copy(batteryExempt = false), observeOnly = false))
@@ -404,5 +426,71 @@ class ConsoleFormatterTest {
         assertEquals("OFFLINE", hudOffline.statusCode)
         assertEquals(0, hudOffline.syncPercent)
         assertTrue(hudOffline.isAlert)
+    }
+
+    @Test
+    fun `config audit exposes hidden failures and adapts copy across all three UI themes`() {
+        val healthy = KeepAliveStatus(
+            masterEnabled = true,
+            accessibilityEnabled = true,
+            accessibilityConnected = true,
+            foregroundActive = true,
+            batteryExempt = true,
+            backgroundRestricted = false,
+            notificationsVisible = true,
+            notificationPermissionGranted = true,
+            notificationChannelReady = true,
+            oemKeepAliveConfirmed = true
+        )
+
+        val fullPass = ConsoleFormatter.buildConfigAudit(
+            healthy,
+            observeOnly = false,
+            brandName = "荣耀手机（MagicOS）",
+            style = ConsoleFormatter.ThemeStyleOption.ENDFIELD
+        )
+        assertEquals(5, fullPass.totalCount)
+        assertEquals(5, fullPass.passedCount)
+        assertTrue(fullPass.canRunLiveTest)
+        assertEquals("01", fullPass.items.first().indexLabel)
+        assertEquals("05", fullPass.items.last().indexLabel)
+        assertTrue(fullPass.items.all { it.status == ConsoleFormatter.AuditItemStatus.PASS })
+
+        val disguised = healthy.copy(
+            foregroundActive = false,
+            oemKeepAliveConfirmed = false
+        )
+        val auditDisguised = ConsoleFormatter.buildConfigAudit(
+            disguised,
+            observeOnly = false,
+            brandName = "荣耀手机（MagicOS）",
+            style = ConsoleFormatter.ThemeStyleOption.CLASSIC
+        )
+        assertEquals(3, auditDisguised.passedCount)
+        assertEquals("1", auditDisguised.items.first().indexLabel)
+        assertEquals(ConsoleFormatter.AuditItemStatus.WARN, auditDisguised.items[1].status)
+        assertEquals("前台未拉起", auditDisguised.items[1].statusLabel)
+        assertEquals(ConsoleFormatter.AuditItemStatus.WARN, auditDisguised.items[4].status)
+        assertEquals(ConsoleFormatter.AuditAction.TOGGLE_OEM_CONFIRM, auditDisguised.items[4].secondaryAction)
+
+        val disabled = healthy.copy(accessibilityEnabled = false, batteryExempt = false, backgroundRestricted = true)
+        val auditDisabled = ConsoleFormatter.buildConfigAudit(
+            disabled,
+            observeOnly = false,
+            brandName = "荣耀手机（MagicOS）",
+            style = ConsoleFormatter.ThemeStyleOption.MEOW
+        )
+        assertFalse(auditDisabled.canRunLiveTest)
+        assertEquals(ConsoleFormatter.AuditItemStatus.FAIL, auditDisabled.items[0].status)
+        assertEquals(ConsoleFormatter.AuditAction.OPEN_RESTRICTED, auditDisabled.items[0].secondaryAction)
+        assertEquals(ConsoleFormatter.AuditItemStatus.FAIL, auditDisabled.items[3].status)
+
+        val classicCopy = ConsoleFormatter.themeActionCopy(ConsoleFormatter.ThemeStyleOption.CLASSIC)
+        val endfieldCopy = ConsoleFormatter.themeActionCopy(ConsoleFormatter.ThemeStyleOption.ENDFIELD)
+        val meowCopy = ConsoleFormatter.themeActionCopy(ConsoleFormatter.ThemeStyleOption.MEOW)
+        assertNotEquals(classicCopy.homeCheckLabel, endfieldCopy.homeCheckLabel)
+        assertNotEquals(endfieldCopy.homeCheckLabel, meowCopy.homeCheckLabel)
+        assertTrue(endfieldCopy.homeCheckLabel.contains("DIAG"))
+        assertTrue(meowCopy.homeCheckLabel.contains("猫猫"))
     }
 }

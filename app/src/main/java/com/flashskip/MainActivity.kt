@@ -29,6 +29,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.SeekBar
 import android.widget.TextView
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.appcompat.widget.SwitchCompat
@@ -145,6 +146,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvHomeCheckNotif: TextView
     private lateinit var tvHomeCheckBattery: TextView
     private lateinit var tvHomeCheckBg: TextView
+    private lateinit var btnHomeConfigCheck: EfButton
     private lateinit var btnGoKeepAlive: EfButton
 
     private lateinit var telemetryPanel: View
@@ -166,6 +168,7 @@ class MainActivity : AppCompatActivity() {
     // Keep-Alive Tab Views
     private lateinit var tvTitleKeepAlive: TextView
     private lateinit var tvDescKeepAlive: TextView
+    private lateinit var btnKaConfigCheck: EfButton
     private lateinit var cardKaChecklist: View
     private lateinit var kaDivider1: View
     private lateinit var kaDivider2: View
@@ -187,6 +190,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvKaBgBadge: TextView
     private lateinit var tvKaBgDesc: TextView
     private lateinit var btnOemBackground: EfButton
+    private lateinit var btnOemConfirm: EfButton
     private lateinit var kaJumpFeedbackBanner: LinearLayout
     private lateinit var vKaFeedbackBar: View
     private lateinit var tvKaFeedbackFlag: TextView
@@ -285,6 +289,8 @@ class MainActivity : AppCompatActivity() {
     private var currentAwakeCatPose = ConsoleFormatter.pickRandomAwakePose(null, kotlin.random.Random.nextInt())
     private var isCatAwakeNow = false
     private var skipFirstStartRandomize = false
+    private var activeAuditDialog: AlertDialog? = null
+    private var reopenAuditOnResume = false
 
     private fun randomizeAwakeCatPose() {
         currentAwakeCatPose = ConsoleFormatter.pickRandomAwakePose(
@@ -504,6 +510,7 @@ class MainActivity : AppCompatActivity() {
         tvHomeCheckNotif = findViewById(R.id.tvHomeCheckNotif)
         tvHomeCheckBattery = findViewById(R.id.tvHomeCheckBattery)
         tvHomeCheckBg = findViewById(R.id.tvHomeCheckBg)
+        btnHomeConfigCheck = findViewById(R.id.btnHomeConfigCheck)
         btnGoKeepAlive = findViewById(R.id.btnGoKeepAlive)
 
         telemetryPanel = findViewById(R.id.telemetryPanel)
@@ -524,6 +531,7 @@ class MainActivity : AppCompatActivity() {
 
         tvTitleKeepAlive = findViewById(R.id.tvTitleKeepAlive)
         tvDescKeepAlive = findViewById(R.id.tvDescKeepAlive)
+        btnKaConfigCheck = findViewById(R.id.btnKaConfigCheck)
         cardKaChecklist = findViewById(R.id.cardKaChecklist)
         kaDivider1 = findViewById(R.id.kaDivider1)
         kaDivider2 = findViewById(R.id.kaDivider2)
@@ -545,6 +553,7 @@ class MainActivity : AppCompatActivity() {
         tvKaBgBadge = findViewById(R.id.tvKaBgBadge)
         tvKaBgDesc = findViewById(R.id.tvKaBgDesc)
         btnOemBackground = findViewById(R.id.btnOemBackground)
+        btnOemConfirm = findViewById(R.id.btnOemConfirm)
         kaJumpFeedbackBanner = findViewById(R.id.kaJumpFeedbackBanner)
         vKaFeedbackBar = findViewById(R.id.vKaFeedbackBar)
         tvKaFeedbackFlag = findViewById(R.id.tvKaFeedbackFlag)
@@ -965,6 +974,11 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Refresh all EfButtons to adopt cut corners / candy rounded / classic styles
+        val copy = ConsoleFormatter.themeActionCopy(
+            ConsoleFormatter.ThemeStyleOption.fromKey(statsStore.uiThemeStyle)
+        )
+        btnHomeConfigCheck.text = copy.homeCheckLabel
+        btnKaConfigCheck.text = copy.kaCheckLabel
         refreshEfButtonsInTree(rootContainer)
     }
 
@@ -1170,12 +1184,16 @@ class MainActivity : AppCompatActivity() {
             when {
                 status.state == com.flashskip.keepalive.KeepAliveState.NEEDS_ACCESSIBILITY -> openAppDetailsWithFeedback()
                 status.state == com.flashskip.keepalive.KeepAliveState.RUNNING &&
-                    status.batteryExempt && !status.backgroundRestricted && status.notificationsVisible &&
+                    status.isKeepAliveHealthy &&
                     !statsStore.observeOnly -> selectTab(1, scrollToTop = true)
                 status.state == com.flashskip.keepalive.KeepAliveState.RUNNING &&
                     !statsStore.observeOnly -> startTestScenario(TestSplashActivity.SCENARIO_STANDARD)
                 else -> selectTab(1, scrollToTop = true)
             }
+        }
+
+        btnHomeConfigCheck.setOnClickListener {
+            openConfigAuditDialog()
         }
 
         btnGoKeepAlive.setOnClickListener {
@@ -1190,6 +1208,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Keep-Alive Tab Buttons
+        btnKaConfigCheck.setOnClickListener { openConfigAuditDialog() }
         btnKaAccessibility.setOnClickListener { openAccessibilityWithFeedback() }
         btnRestrictedSettings.setOnClickListener { openAppDetailsWithFeedback() }
         btnKaAppDetails.setOnClickListener { openAppDetailsWithFeedback() }
@@ -1205,14 +1224,11 @@ class MainActivity : AppCompatActivity() {
         }
 
         btnOemBackground.setOnClickListener {
-            val dest = PermissionHelper.openOemBackgroundSettings(this)
-            hasTriedOemJump = true
-            lastOemDestination = dest
-            renderOemJumpFeedback()
-            if (dest == null) {
-                showToast("无法自动跳转，请按下方第 1–4 步手动设置")
-                scrollToSection(keepAliveGuideCard)
-            }
+            openOemBackgroundWithFeedback()
+        }
+
+        btnOemConfirm.setOnClickListener {
+            toggleOemKeepAliveConfirmed(reopenAudit = false)
         }
 
         btnBrowseOtherBrands.setOnClickListener {
@@ -1870,12 +1886,28 @@ class MainActivity : AppCompatActivity() {
             handler.removeCallbacks(reconnectCheck)
             handler.postDelayed(reconnectCheck, 500)
         }
+        if (reopenAuditOnResume) {
+            reopenAuditOnResume = false
+            handler.post {
+                if (!isFinishing && !isDestroyed) openConfigAuditDialog()
+            }
+        } else if (activeAuditDialog?.isShowing == true) {
+            handler.post {
+                if (!isFinishing && !isDestroyed && activeAuditDialog?.isShowing == true) openConfigAuditDialog()
+            }
+        }
     }
 
     override fun onPause() {
         handler.removeCallbacks(refresh)
         handler.removeCallbacks(reconnectCheck)
         super.onPause()
+    }
+
+    override fun onDestroy() {
+        activeAuditDialog?.dismiss()
+        activeAuditDialog = null
+        super.onDestroy()
     }
 
     private fun applyStatusPillStyle(view: TextView, tone: ConsoleFormatter.StatusTone) {
@@ -2074,10 +2106,12 @@ class MainActivity : AppCompatActivity() {
         )
         renderHomeCheckChip(
             tvHomeCheckNotif,
-            if (status.notificationsVisible) {
-                "守护通知：已开启" to ConsoleFormatter.StatusTone.OK
-            } else {
-                "守护通知：未开启" to ConsoleFormatter.StatusTone.WARN
+            when {
+                status.notificationsReady ->
+                    (if (status.foregroundActive) "守护通知：运行中" else "守护通知：已允许") to ConsoleFormatter.StatusTone.OK
+                status.accessibilityConnected && status.masterEnabled && status.notificationsVisible ->
+                    "守护通知：未拉起" to ConsoleFormatter.StatusTone.WARN
+                else -> "守护通知：未开启" to ConsoleFormatter.StatusTone.WARN
             }
         )
         renderHomeCheckChip(
@@ -2090,21 +2124,32 @@ class MainActivity : AppCompatActivity() {
         )
         renderHomeCheckChip(
             tvHomeCheckBg,
-            if (!status.backgroundRestricted) {
-                "系统后台：未受限" to ConsoleFormatter.StatusTone.OK
-            } else {
-                "系统后台：被限制中" to ConsoleFormatter.StatusTone.ALERT
+            when {
+                status.backgroundRestricted -> "系统后台：被限制中" to ConsoleFormatter.StatusTone.ALERT
+                !status.oemKeepAliveConfirmed -> "厂商自启：待核对" to ConsoleFormatter.StatusTone.WARN
+                else -> "后台自启：已核对" to ConsoleFormatter.StatusTone.OK
             }
         )
 
         tvHomeKeepAliveSummary.text = when {
-            readiness4.readyCount == 4 -> "4 项核心保护全部就绪。再在手机“最近任务”里把闪跳卡片加锁，全天运行会更稳。"
-            status.backgroundRestricted -> "系统当前限制了后台运行，锁屏后很容易失效，请点下方按钮去放行。"
-            else -> "还有 ${4 - readiness4.readyCount} 项待完善。完成后，息屏放几小时或一整天也能稳稳工作。"
+            readiness4.readyCount == 4 -> "4 项核心保护全部核验就绪。再在手机“最近任务”里把闪跳卡片加锁，全天运行会更稳。"
+            status.backgroundRestricted -> "系统当前限制了后台运行，锁屏后很容易失效，请点下方按钮体检并放行。"
+            !status.oemKeepAliveConfirmed && status.accessibilityConnected &&
+                status.notificationsReady && status.batteryExempt ->
+                "基础权限已齐，还差核对本机厂商「应用启动管理 / 自启动」设置，点下方「配置体检」即可直达确认。"
+            else -> "还有 ${4 - readiness4.readyCount} 项待完善。点下方「配置体检」逐项排查，完成后息屏一整天也能稳稳工作。"
         }
-        btnGoKeepAlive.setEfKind(
-            if (readiness4.readyCount < 4 && status.accessibilityConnected) EfButton.Kind.GO else EfButton.Kind.NORMAL
+        btnHomeConfigCheck.setEfKind(
+            if (readiness4.readyCount < 4 ||
+                status.state != com.flashskip.keepalive.KeepAliveState.RUNNING ||
+                observeOnly
+            ) {
+                EfButton.Kind.GO
+            } else {
+                EfButton.Kind.NORMAL
+            }
         )
+        btnGoKeepAlive.setEfKind(EfButton.Kind.NORMAL)
 
         // Keep-Alive Tab Detailed Checklist
         renderKeepAliveTab(status)
@@ -2157,20 +2202,28 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        if (status.notificationsVisible) {
-            tvKaNotifBadge.text = "已开启"
-            applyStatusPillStyle(tvKaNotifBadge, ConsoleFormatter.StatusTone.OK)
-            btnKaNotification.text = "通知设置（已开启）"
-        } else {
-            tvKaNotifBadge.text = "建议开启"
-            applyStatusPillStyle(tvKaNotifBadge, ConsoleFormatter.StatusTone.WARN)
-            val runtimeMissing = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
-                PackageManager.PERMISSION_GRANTED
-            btnKaNotification.text = if (runtimeMissing && !notifPromptedOnce) {
-                "允许状态栏守护通知"
-            } else {
-                "去系统设置开启通知"
+        when {
+            status.notificationsReady -> {
+                tvKaNotifBadge.text = if (status.foregroundActive) "运行中" else "已开启"
+                applyStatusPillStyle(tvKaNotifBadge, ConsoleFormatter.StatusTone.OK)
+                btnKaNotification.text = "通知设置（${if (status.foregroundActive) "运行中" else "已开启"}）"
+            }
+            status.accessibilityConnected && status.masterEnabled && status.notificationsVisible -> {
+                tvKaNotifBadge.text = "前台未拉起"
+                applyStatusPillStyle(tvKaNotifBadge, ConsoleFormatter.StatusTone.WARN)
+                btnKaNotification.text = "检查通知渠道与前台守护"
+            }
+            else -> {
+                tvKaNotifBadge.text = "建议开启"
+                applyStatusPillStyle(tvKaNotifBadge, ConsoleFormatter.StatusTone.WARN)
+                val runtimeMissing = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                    ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
+                    PackageManager.PERMISSION_GRANTED
+                btnKaNotification.text = if (runtimeMissing && !notifPromptedOnce) {
+                    "允许状态栏守护通知"
+                } else {
+                    "去系统设置开启通知"
+                }
             }
         }
 
@@ -2184,13 +2237,36 @@ class MainActivity : AppCompatActivity() {
             btnBatteryOpt.text = getString(R.string.btn_battery_opt)
         }
 
-        if (status.backgroundRestricted) {
-            tvKaBgBadge.text = "已被系统限制"
-            applyStatusPillStyle(tvKaBgBadge, ConsoleFormatter.StatusTone.ALERT)
-        } else {
-            tvKaBgBadge.text = "未发现系统拦截"
-            applyStatusPillStyle(tvKaBgBadge, ConsoleFormatter.StatusTone.OK)
+        when {
+            status.backgroundRestricted -> {
+                tvKaBgBadge.text = "已被系统限制"
+                applyStatusPillStyle(tvKaBgBadge, ConsoleFormatter.StatusTone.ALERT)
+            }
+            !status.oemKeepAliveConfirmed -> {
+                tvKaBgBadge.text = "待人工核对"
+                applyStatusPillStyle(tvKaBgBadge, ConsoleFormatter.StatusTone.WARN)
+            }
+            else -> {
+                tvKaBgBadge.text = "已核对放行"
+                applyStatusPillStyle(tvKaBgBadge, ConsoleFormatter.StatusTone.OK)
+            }
         }
+
+        val copy = ConsoleFormatter.themeActionCopy(
+            ConsoleFormatter.ThemeStyleOption.fromKey(statsStore.uiThemeStyle)
+        )
+        btnOemConfirm.text = if (status.oemKeepAliveConfirmed) copy.oemResetLabel else copy.oemConfirmLabel
+        btnOemBackground.setEfKind(if (status.backgroundReady) EfButton.Kind.NORMAL else EfButton.Kind.GO)
+        btnKaConfigCheck.setEfKind(
+            if (status.isKeepAliveHealthy &&
+                status.state == com.flashskip.keepalive.KeepAliveState.RUNNING &&
+                !statsStore.observeOnly
+            ) {
+                EfButton.Kind.NORMAL
+            } else {
+                EfButton.Kind.GO
+            }
+        )
 
         tvKeepAliveInfo.text = PermissionHelper.oemKeepAliveAdvice()
         renderOemJumpFeedback()
@@ -2427,6 +2503,98 @@ class MainActivity : AppCompatActivity() {
             putExtra(Intent.EXTRA_TEXT, content)
         }
         startActivity(Intent.createChooser(intent, "分享或导出运行记录"))
+    }
+
+    private fun openOemBackgroundWithFeedback(scrollOnFail: Boolean = true) {
+        val dest = PermissionHelper.openOemBackgroundSettings(this)
+        hasTriedOemJump = true
+        lastOemDestination = dest
+        renderOemJumpFeedback()
+        if (dest == null) {
+            showToast("无法自动跳转，请按下方第 1–4 步手动设置")
+            if (scrollOnFail) scrollToSection(keepAliveGuideCard)
+        }
+    }
+
+    private fun toggleOemKeepAliveConfirmed(reopenAudit: Boolean) {
+        val next = !statsStore.oemKeepAliveConfirmed
+        statsStore.oemKeepAliveConfirmed = next
+        SkipLog.log("SETTING oem_keepalive_confirmed=$next")
+        refreshUi(forceLog = false)
+        if (reopenAudit) openConfigAuditDialog()
+        showToast(if (next) "已标记厂商后台自启为已核对" else "已重置厂商自启核对状态")
+    }
+
+    private fun openConfigAuditDialog() {
+        SkipAdService.refreshForegroundProtection()
+        val status = PermissionHelper.readStatus(this)
+        val style = ConsoleFormatter.ThemeStyleOption.fromKey(statsStore.uiThemeStyle)
+        val brandName = ConsoleFormatter.brandDisplayName(Build.MANUFACTURER, Build.BRAND)
+        val report = ConsoleFormatter.buildConfigAudit(status, statsStore.observeOnly, brandName, style)
+        val copy = ConsoleFormatter.themeActionCopy(style)
+        activeAuditDialog?.dismiss()
+        val dlg = EfDialogs.showConfigAuditDialog(this, report, copy) { action ->
+            handleAuditAction(action)
+        }
+        dlg.setOnDismissListener {
+            if (activeAuditDialog === dlg) activeAuditDialog = null
+        }
+        activeAuditDialog = dlg
+    }
+
+    private fun handleAuditAction(action: ConsoleFormatter.AuditAction) {
+        when (action) {
+            ConsoleFormatter.AuditAction.OPEN_ACCESSIBILITY -> {
+                reopenAuditOnResume = true
+                openAccessibilityWithFeedback()
+            }
+            ConsoleFormatter.AuditAction.OPEN_RESTRICTED,
+            ConsoleFormatter.AuditAction.OPEN_APP_DETAILS -> {
+                reopenAuditOnResume = true
+                openAppDetailsWithFeedback()
+            }
+            ConsoleFormatter.AuditAction.RESUME_MASTER -> {
+                statsStore.masterEnabled = true
+                SkipLog.log("SETTING master_enabled=true")
+                SkipAdService.refreshForegroundProtection()
+                refreshUi(forceLog = false)
+                openConfigAuditDialog()
+                showToast("已恢复自动跳过广告")
+            }
+            ConsoleFormatter.AuditAction.DISABLE_OBSERVE -> {
+                statsStore.observeOnly = false
+                SkipLog.log("SETTING observe_only=false")
+                refreshUi(forceLog = false)
+                openConfigAuditDialog()
+                showToast("已关闭演练模式，恢复正常自动跳过")
+            }
+            ConsoleFormatter.AuditAction.OPEN_NOTIFICATION -> {
+                reopenAuditOnResume = true
+                handleNotificationSetupClick()
+            }
+            ConsoleFormatter.AuditAction.OPEN_BATTERY -> {
+                reopenAuditOnResume = true
+                if (!PermissionHelper.openBatteryOptimizationSettings(this)) {
+                    showToast("未能打开电池设置，请在手机设置中搜索“电池优化”")
+                }
+            }
+            ConsoleFormatter.AuditAction.OPEN_OEM_BACKGROUND -> {
+                reopenAuditOnResume = true
+                openOemBackgroundWithFeedback(scrollOnFail = false)
+            }
+            ConsoleFormatter.AuditAction.TOGGLE_OEM_CONFIRM -> {
+                toggleOemKeepAliveConfirmed(reopenAudit = true)
+            }
+            ConsoleFormatter.AuditAction.RUN_LIVE_TEST -> {
+                reopenAuditOnResume = false
+                val status = PermissionHelper.readStatus(this)
+                if (status.state == com.flashskip.keepalive.KeepAliveState.RUNNING && !statsStore.observeOnly) {
+                    startTestScenario(TestSplashActivity.SCENARIO_STANDARD)
+                } else {
+                    showToast("请先开启并连接无障碍服务（关闭演练模式），再进行实测跳过")
+                }
+            }
+        }
     }
 
     private fun showToast(message: String) {

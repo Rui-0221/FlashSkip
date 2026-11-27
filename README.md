@@ -3,13 +3,15 @@
   FlashSkip（闪跳）
 </h1>
 
-[![Version](https://img.shields.io/badge/Version-1.1-161616.svg)](#)
+[![Version](https://img.shields.io/badge/Version-1.1.1-161616.svg)](#)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.0.21-7F52FF.svg)](https://kotlinlang.org)
 [![Android](https://img.shields.io/badge/Android-8.0%2B%20(API%2026--34)-3DDC84.svg)](https://developer.android.com)
 [![Network](https://img.shields.io/badge/Network-Zero%20Permission-0A7EA4.svg)](#隐私与安全设计)
 
 **FlashSkip** 是一款基于 Android 无障碍服务（`AccessibilityService`）的事件驱动开屏广告自动跳过工具——**无需 Root、零网络权限、纯本地运行**。通过纯 Kotlin 编写的规则与状态机引擎，在极短延迟内识别并点击“跳过”按钮，同时内置多层防误触机制，防止误点全屏广告落地页或正常业务按钮。
 
+> **v1.1.1 更新**：上线 **全链路「一键配置体检」与真实状态校验（彻底消除假绿灯）**——守护通知现联合核验 `POST_NOTIFICATIONS` 运行时权限、通知渠道存活与前台服务运行状态（`foregroundActive`）；将原生「系统未禁止后台」与手机厂商「应用启动管理 / 自启动与后台加锁」拆分展示并引入本地人工核对确认（重装自动清零重检）；在「首页」与「后台保活」页新增「一键配置体检」入口及厂商自启确认按钮，完整适配 **日常简约 / 终末地 / 软萌猫咪** 三套界面主题，并在 5 项体检报告弹窗中直连设置修复与内置「实测跳过一下」闭环校验；JVM 单元测试扩充至 `82 / 82`。
+>
 > **v1.1 更新**：新增 **侧边栏小窗（自由窗口 / Freeform）开屏自动跳过**（无障碍与 Shizuku 双引擎支持：系统装饰栏与窗口层级核验、逻辑/屏幕坐标映射、独立小窗中央列防误触保护，兼容冷启动、30 秒+热重进、熄屏 DOZE 解锁重进与拖动缩放/切回全屏，普通 `Dialog` 与移出屏幕保持零误触）；同步统一「日常简约（Classic）」顶栏品牌图标（`ic_ef_flash_seal.xml`）为新版图标；JVM 单元测试扩充至 `80 / 80`。
 >
 > **v1.0.3 更新**：修复状态栏常驻通知小图标（`ic_stat_flash.xml`）未同步更新的问题，与新版应用图标保持一致；收紧双引擎跨窗关闭证据校验，仅在输入仍处于对应热重进时段且目标窗口 ID 一致时才采信缓存业务窗，修复普通同包导流误计为 `VERIFIED_CLOSED` 的问题。
@@ -20,7 +22,12 @@
 
 ---
 
-## 核心特性（v1.1）
+## 核心特性（v1.1.1）
+
+- **一键配置体检与真实状态校验（拒绝假绿灯）**：
+  - 守护通知不再只看系统总开关，同步校验 `POST_NOTIFICATIONS` 运行时权限、通知渠道可用性及 `foregroundActive` 前台常驻状态；
+  - 将系统原生「未限制后台」与手机厂商管家的「自启动 / 关联启动 / 后台加锁」明确拆开（重装自动清零重检），未手动核对前如实标为「待核对」，并联动终末地 HUD 同步率与软萌猫咪苏醒状态；
+  - 在「首页」保活卡片与「后台保活」页提供一键深度体检入口，弹出三套主题自适应的 5 项核验报告（无障碍真实连接 / 前台守护通知 / 电池白名单 / 原生后台限制 / 厂商自启与加锁），支持直达设置页修复与弹窗内「实测跳过」闭环验证。
 
 - **全屏 + 侧边栏小窗（Freeform）双形态跳过**：
   - 除传统全屏开屏外，现支持通过系统侧边栏以**自由窗口（小窗模式）**启动应用时自动识别并跳过开屏广告；
@@ -122,7 +129,7 @@
 
 ### 自动化测试与真机回归结果
 
-- **JVM 单元测试**：`80 / 80` 项全部通过（`:core` 58 项 + `:app` 22 项，0 失败 / 0 跳过）。
+- **JVM 单元测试**：`82 / 82` 项全部通过（`:core` 58 项 + `:app` 24 项，0 失败 / 0 跳过）。
 - **内置对抗靶场（[TestSplashActivity.kt](app/src/main/java/com/flashskip/TestSplashActivity.kt)）**：
   - 全屏 8 项核心对抗回归（5 正向跳过 + 3 负向防误触 `neg_guide` / `neg_redpacket` / `neg_center`）在荣耀 API 36 双引擎下全数通过（无障碍 `8 / 8`、Shizuku `8 / 8`，0 失败）；
   - 小窗形态下 `standard` / `non_clickable` 分别通过原生点击与手势确认关闭（`VERIFIED_CLOSED`），全屏与小窗普通 `Dialog`、引导、红包及居中按钮对照均保持零输入；
@@ -158,9 +165,9 @@ app/ (Android 服务、实验双引擎、保活与界面层)
  ├── a11y/ForegroundAccess.kt      未知类型（type=-1）焦点窗口实时一致性核验与取根
  ├── a11y/WindowTrace.kt & SkipTrace.kt  按需启用的脱敏窗口/动作阶段诊断追踪
  ├── experimental/                 可选 Shizuku 实验引擎（ExperimentalSkip / UiAutomationRunner / SkipActionGate / FloatingTaskProof）
- ├── keepalive/                    PermissionHelper / KeepAliveStatus / BackgroundSettings 多品牌保活检测与直达
- ├── data/SkipLog.kt & StatsStore.kt     双文件轮转日志、本地 P50/P95 延迟统计与主题/开关持久化
- ├── ui/                           FlashTheme（三风格）、EndfieldDecorViews、MeowDecorViews、SkipSuccessToast 等
+ ├── keepalive/                    PermissionHelper / KeepAliveStatus / BackgroundSettings 真实权限渠道核验与多品牌保活直达
+ ├── data/SkipLog.kt & StatsStore.kt     双文件轮转日志、本地 P50/P95 延迟统计与主题/开关/自启核对持久化
+ ├── ui/                           FlashTheme（三风格）、ConsoleFormatter（含 5 项配置体检模型）、EfDialogs（三风格体检弹窗）、EndfieldDecorViews、MeowDecorViews、SkipSuccessToast 等
  └── MainActivity.kt & TestSplashActivity.kt  三分区用户界面、20+ 场景分组靶场与 launch_scenario 自动化入口
 ```
 

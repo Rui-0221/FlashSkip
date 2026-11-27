@@ -190,17 +190,22 @@ object ConsoleFormatter {
         KeepAliveState.PAUSED -> HeaderStatus("已暂停", StatusTone.PAUSED)
         KeepAliveState.RUNNING -> when {
             observeOnly -> HeaderStatus("演练中", StatusTone.WARN)
-            !status.batteryExempt || status.backgroundRestricted -> HeaderStatus("建议保活", StatusTone.WARN)
+            !status.isKeepAliveHealthy -> HeaderStatus("建议保活", StatusTone.WARN)
             else -> HeaderStatus("保护中", StatusTone.OK)
         }
     }
 
     fun formatHomeHero(status: KeepAliveStatus, observeOnly: Boolean): HomeHeroPresentation {
-        val keepAliveHealthy = status.batteryExempt && !status.backgroundRestricted && status.notificationsVisible
+        val keepAliveHealthy = status.isKeepAliveHealthy
+        val foregroundMissing = status.accessibilityConnected &&
+            status.masterEnabled &&
+            status.notificationsVisible &&
+            (!status.notificationChannelReady || !status.foregroundActive)
         val keepAliveChip = when {
             status.backgroundRestricted -> "系统限制后台运行"
             !status.batteryExempt -> "未关闭省电限制"
-            !status.notificationsVisible -> "建议允许状态通知"
+            !status.notificationsReady -> if (foregroundMissing) "守护通知未运行" else "建议允许状态通知"
+            !status.oemKeepAliveConfirmed -> "厂商自启待核对"
             else -> "后台常驻已就绪"
         }
 
@@ -268,8 +273,14 @@ object ConsoleFormatter {
                             "当前可以跳过广告，但系统限制了后台活动，息屏或过几小时后很可能自动停止工作。"
                         !status.batteryExempt ->
                             "当前可以跳过广告，但还未关闭电池省电限制，手机息屏一会后服务容易被系统清理。"
+                        !status.notificationsReady ->
+                            if (foregroundMissing) {
+                                "当前可以跳过广告，但前台守护通知未实际拉起，后台更容易被系统回收，请点「一键配置体检」排查。"
+                            } else {
+                                "当前可以跳过广告，建议允许状态栏通知以减少后台被清理，并显示“已跳过广告”轻提示。"
+                            }
                         else ->
-                            "当前可以跳过广告，建议允许状态栏通知以减少后台被清理，并显示“已跳过广告”轻提示。"
+                            "当前可以跳过广告，但尚未核对手机厂商「应用启动管理 / 自启动」设置，锁屏或清理后台后容易失效。"
                     }
                     HomeHeroPresentation(
                         badgeText = "保护中 · 建议设置保活",
@@ -278,7 +289,7 @@ object ConsoleFormatter {
                         keepAliveHealthy = false,
                         headline = "正在为您跳过广告，建议完成后台保活",
                         description = reason,
-                        bannerText = "完成「后台保活」设置后，无需频繁重开，1 小时、半天甚至整天都能稳稳工作。",
+                        bannerText = "完成「后台保活」设置并核对自启后，无需频繁重开，1 小时、半天甚至整天都能稳稳工作。",
                         primaryCtaLabel = "去确保后台长期有效",
                         primaryAction = HomePrimaryAction.OPEN_KEEPALIVE,
                         secondaryCtaLabel = "先体验一次模拟跳过",
@@ -305,9 +316,9 @@ object ConsoleFormatter {
 
     fun computeKeepAliveReadiness4(status: KeepAliveStatus): ReadinessState {
         val ready = (if (status.accessibilityConnected) 1 else 0) +
-            (if (status.notificationsVisible) 1 else 0) +
+            (if (status.notificationsReady) 1 else 0) +
             (if (status.batteryExempt) 1 else 0) +
-            (if (!status.backgroundRestricted) 1 else 0)
+            (if (status.backgroundReady) 1 else 0)
         return ReadinessState(
             readyCount = ready,
             totalCount = 4,
@@ -495,9 +506,7 @@ object ConsoleFormatter {
     fun isCatAwakeReady(status: KeepAliveStatus, observeOnly: Boolean): Boolean =
         status.state == KeepAliveState.RUNNING &&
             !observeOnly &&
-            status.batteryExempt &&
-            !status.backgroundRestricted &&
-            status.notificationsVisible
+            status.isKeepAliveHealthy
 
     fun pickRandomAwakePose(previous: MeowCatPose?, randomVal: Int): MeowCatPose {
         val candidates = if (previous != null && previous in AWAKE_CAT_POSES) {
@@ -590,12 +599,20 @@ object ConsoleFormatter {
                     speechText = "呼噜…还没设为电量无限制，补齐保活最后几步就能把小猫彻底叫醒哦~"
                 )
 
-                else -> MeowCatPresentation(
+                !status.notificationsReady -> MeowCatPresentation(
                     mood = CatMood.ATTENTIVE_WARN,
                     pose = MeowCatPose.SLEEPING,
                     isAwake = false,
                     titleTag = "zZ 等开守护通知",
-                    speechText = "呼噜…还差状态栏守护通知，去「后台保活」全部开启，小猫马上清醒守护你~"
+                    speechText = "呼噜…还差状态栏守护通知或前台未拉起，点「配置体检」排查一下就能叫醒小猫~"
+                )
+
+                else -> MeowCatPresentation(
+                    mood = CatMood.ATTENTIVE_WARN,
+                    pose = MeowCatPose.SLEEPING,
+                    isAwake = false,
+                    titleTag = "zZ 等核对自启喵",
+                    speechText = "呼噜…还没核对手机自启动管理，点「配置体检」或去「后台保活」确认一下，小猫马上清醒守护你~"
                 )
             }
         }
@@ -605,7 +622,7 @@ object ConsoleFormatter {
         status: KeepAliveStatus,
         observeOnly: Boolean
     ): EndfieldHudTelemetry {
-        val keepAliveHealthy = status.batteryExempt && !status.backgroundRestricted && status.notificationsVisible
+        val keepAliveHealthy = status.isKeepAliveHealthy
         return when (status.state) {
             KeepAliveState.NEEDS_ACCESSIBILITY -> EndfieldHudTelemetry(
                 statusCode = "OFFLINE",
@@ -718,6 +735,278 @@ object ConsoleFormatter {
             themeX = (availW - themeW).coerceAtLeast(0),
             themeY = row3Top,
             contentHeight = row3Top + themeH
+        )
+    }
+
+    enum class AuditItemStatus { PASS, WARN, FAIL }
+
+    enum class AuditAction {
+        OPEN_ACCESSIBILITY,
+        OPEN_RESTRICTED,
+        RESUME_MASTER,
+        DISABLE_OBSERVE,
+        OPEN_NOTIFICATION,
+        OPEN_BATTERY,
+        OPEN_APP_DETAILS,
+        OPEN_OEM_BACKGROUND,
+        TOGGLE_OEM_CONFIRM,
+        RUN_LIVE_TEST
+    }
+
+    data class ConfigAuditItem(
+        val indexLabel: String,
+        val title: String,
+        val statusLabel: String,
+        val detail: String,
+        val status: AuditItemStatus,
+        val primaryActionLabel: String?,
+        val primaryAction: AuditAction?,
+        val secondaryActionLabel: String? = null,
+        val secondaryAction: AuditAction? = null
+    )
+
+    data class ConfigAuditReport(
+        val passedCount: Int,
+        val totalCount: Int,
+        val headline: String,
+        val summary: String,
+        val canRunLiveTest: Boolean,
+        val items: List<ConfigAuditItem>
+    )
+
+    data class ThemeActionCopy(
+        val homeCheckLabel: String,
+        val kaCheckLabel: String,
+        val oemConfirmLabel: String,
+        val oemResetLabel: String,
+        val dialogEyebrow: String,
+        val dialogTitle: String,
+        val liveTestLabel: String,
+        val closeLabel: String
+    )
+
+    fun themeActionCopy(style: ThemeStyleOption): ThemeActionCopy = when (style) {
+        ThemeStyleOption.CLASSIC -> ThemeActionCopy(
+            homeCheckLabel = "一键配置体检",
+            kaCheckLabel = "一键深度体检（核验真实状态）",
+            oemConfirmLabel = "我已在系统页开启自启（标记已核对）",
+            oemResetLabel = "已核对厂商自启（点此重新核对）",
+            dialogEyebrow = "配置体检",
+            dialogTitle = "全项配置深度体检",
+            liveTestLabel = "实测能否正常跳过",
+            closeLabel = "关闭"
+        )
+        ThemeStyleOption.ENDFIELD -> ThemeActionCopy(
+            homeCheckLabel = "DIAG // 一键配置自检",
+            kaCheckLabel = "RUN // 执行全项配置诊断",
+            oemConfirmLabel = "CONFIRM // 标记厂商自启已放行",
+            oemResetLabel = "VERIFIED // 重置厂商自启标记",
+            dialogEyebrow = "SYSTEM AUDIT",
+            dialogTitle = "配置状态深度诊断",
+            liveTestLabel = "EXEC // 实测跳过闭环",
+            closeLabel = "CLOSE"
+        )
+        ThemeStyleOption.MEOW -> ThemeActionCopy(
+            homeCheckLabel = "🐾 帮猫猫做配置体检",
+            kaCheckLabel = "🐾 一键深度体检全项守护",
+            oemConfirmLabel = "🐾 我已帮猫猫开好自启啦",
+            oemResetLabel = "🐾 已核对自启（点此重检）",
+            dialogEyebrow = "猫猫守护体检",
+            dialogTitle = "喵~ 全项守护体检报告",
+            liveTestLabel = "🐾 实测一下猫猫跳过",
+            closeLabel = "好哒"
+        )
+    }
+
+    fun buildConfigAudit(
+        status: KeepAliveStatus,
+        observeOnly: Boolean,
+        brandName: String,
+        style: ThemeStyleOption = ThemeStyleOption.CLASSIC
+    ): ConfigAuditReport {
+        fun idx(n: Int): String = if (style == ThemeStyleOption.ENDFIELD) n.toString().padStart(2, '0') else n.toString()
+
+        val item1 = when {
+            !status.accessibilityEnabled -> ConfigAuditItem(
+                indexLabel = idx(1),
+                title = "无障碍服务与真实连接",
+                statusLabel = "未开启",
+                detail = "系统无障碍未勾选 FlashSkip。若开关为灰色点不动，请先进入应用详情右上角菜单「允许受限设置」。",
+                status = AuditItemStatus.FAIL,
+                primaryActionLabel = "去开启无障碍",
+                primaryAction = AuditAction.OPEN_ACCESSIBILITY,
+                secondaryActionLabel = "解除受限设置",
+                secondaryAction = AuditAction.OPEN_RESTRICTED
+            )
+            !status.accessibilityConnected -> ConfigAuditItem(
+                indexLabel = idx(1),
+                title = "无障碍服务与真实连接",
+                statusLabel = "连接断开",
+                detail = "系统开关已勾选，但后台连接实际已中断（常见于系统清理或重启）。请前往无障碍重新开关一次。",
+                status = AuditItemStatus.WARN,
+                primaryActionLabel = "去重新开关",
+                primaryAction = AuditAction.OPEN_ACCESSIBILITY
+            )
+            !status.masterEnabled -> ConfigAuditItem(
+                indexLabel = idx(1),
+                title = "无障碍服务与真实连接",
+                statusLabel = "总开关已暂停",
+                detail = "无障碍已连接，但您当前手动暂停了应用内总开关，恢复后即可正常跳过。",
+                status = AuditItemStatus.WARN,
+                primaryActionLabel = "立即恢复跳过",
+                primaryAction = AuditAction.RESUME_MASTER
+            )
+            observeOnly -> ConfigAuditItem(
+                indexLabel = idx(1),
+                title = "无障碍服务与真实连接",
+                statusLabel = "演练模式中",
+                detail = "当前仅演练不实际点击，普通日常使用请关闭演练模式。",
+                status = AuditItemStatus.WARN,
+                primaryActionLabel = "关闭演练模式",
+                primaryAction = AuditAction.DISABLE_OBSERVE
+            )
+            else -> ConfigAuditItem(
+                indexLabel = idx(1),
+                title = "无障碍服务与真实连接",
+                statusLabel = "已真实连接",
+                detail = "无障碍服务已真实绑定且总开关开启，具备实时识别与跳过能力。",
+                status = AuditItemStatus.PASS,
+                primaryActionLabel = null,
+                primaryAction = null
+            )
+        }
+
+        val item2 = when {
+            !status.notificationPermissionGranted || !status.notificationsVisible -> ConfigAuditItem(
+                indexLabel = idx(2),
+                title = "前台守护通知存活",
+                statusLabel = "未允许通知",
+                detail = "缺少通知运行时权限或系统通知已被关闭，后台守护容易被系统回收，也无法看到跳过轻提示。",
+                status = AuditItemStatus.WARN,
+                primaryActionLabel = "去允许通知",
+                primaryAction = AuditAction.OPEN_NOTIFICATION
+            )
+            status.accessibilityConnected && status.masterEnabled &&
+                (!status.notificationChannelReady || !status.foregroundActive) -> ConfigAuditItem(
+                    indexLabel = idx(2),
+                    title = "前台守护通知存活",
+                    statusLabel = "前台未拉起",
+                    detail = "虽然总通知权限已允许，但守护通知渠道被禁用或前台守护未实际运行，请检查通知设置。",
+                    status = AuditItemStatus.WARN,
+                    primaryActionLabel = "检查通知渠道",
+                    primaryAction = AuditAction.OPEN_NOTIFICATION
+                )
+            else -> ConfigAuditItem(
+                indexLabel = idx(2),
+                title = "前台守护通知存活",
+                statusLabel = if (status.foregroundActive) "守护运行中" else "权限已允许",
+                detail = if (status.foregroundActive) {
+                    "通知权限、守护渠道与前台常驻服务均已真正在系统内运行。"
+                } else {
+                    "通知权限已允许；待无障碍服务连接后会自动拉起静默守护通知。"
+                },
+                status = AuditItemStatus.PASS,
+                primaryActionLabel = null,
+                primaryAction = null
+            )
+        }
+
+        val item3 = if (!status.batteryExempt) {
+            ConfigAuditItem(
+                indexLabel = idx(3),
+                title = "系统电池优化白名单",
+                statusLabel = "受省电限制",
+                detail = "尚未加入系统电池优化白名单，息屏放置一段时间后容易被系统省电策略清理。",
+                status = AuditItemStatus.WARN,
+                primaryActionLabel = "设为无限制",
+                primaryAction = AuditAction.OPEN_BATTERY
+            )
+        } else {
+            ConfigAuditItem(
+                indexLabel = idx(3),
+                title = "系统电池优化白名单",
+                statusLabel = "已豁免省电",
+                detail = "系统标准电池优化已放行，可显著减少息屏休眠清理。",
+                status = AuditItemStatus.PASS,
+                primaryActionLabel = null,
+                primaryAction = null
+            )
+        }
+
+        val item4 = if (status.backgroundRestricted) {
+            ConfigAuditItem(
+                indexLabel = idx(4),
+                title = "系统原生后台限制",
+                statusLabel = "已被系统限制",
+                detail = "Android 原生后台电池限制已拦截本应用，请在应用详情的「电池」页解除限制。",
+                status = AuditItemStatus.FAIL,
+                primaryActionLabel = "去应用信息放行",
+                primaryAction = AuditAction.OPEN_APP_DETAILS
+            )
+        } else {
+            ConfigAuditItem(
+                indexLabel = idx(4),
+                title = "系统原生后台限制",
+                statusLabel = "原生未拦截",
+                detail = "原生 Android 未禁止后台运行；国产手机管家自启动开关不向应用开放读取，需核对下方第 5 项。",
+                status = AuditItemStatus.PASS,
+                primaryActionLabel = null,
+                primaryAction = null
+            )
+        }
+
+        val item5 = if (!status.oemKeepAliveConfirmed) {
+            ConfigAuditItem(
+                indexLabel = idx(5),
+                title = "厂商自启与加锁（$brandName）",
+                statusLabel = "待人工核对",
+                detail = "Android 不允许应用读取系统管家的自启动/关联启动开关。请先点按钮前往确认已全部打开，再点「我已开启」。",
+                status = AuditItemStatus.WARN,
+                primaryActionLabel = "去厂商后台页",
+                primaryAction = AuditAction.OPEN_OEM_BACKGROUND,
+                secondaryActionLabel = "我已开启",
+                secondaryAction = AuditAction.TOGGLE_OEM_CONFIRM
+            )
+        } else {
+            ConfigAuditItem(
+                indexLabel = idx(5),
+                title = "厂商自启与加锁（$brandName）",
+                statusLabel = "已人工核对",
+                detail = "您已确认放行本机自启动与后台活动；建议同时在「最近任务」里给闪跳卡片加上小锁。",
+                status = AuditItemStatus.PASS,
+                primaryActionLabel = "再次查看设置",
+                primaryAction = AuditAction.OPEN_OEM_BACKGROUND,
+                secondaryActionLabel = "重置为待核对",
+                secondaryAction = AuditAction.TOGGLE_OEM_CONFIRM
+            )
+        }
+
+        val items = listOf(item1, item2, item3, item4, item5)
+        val passed = items.count { it.status == AuditItemStatus.PASS }
+        val total = items.size
+        val canRunLiveTest = status.state == KeepAliveState.RUNNING && !observeOnly
+        val headline = when {
+            passed == total && canRunLiveTest -> "全部配置已核验就绪"
+            status.state == KeepAliveState.NEEDS_ACCESSIBILITY -> "核心无障碍尚未开启"
+            status.state == KeepAliveState.CONNECTING -> "无障碍连接已断开"
+            else -> "仍有 ${total - passed} 项待完善或核对"
+        }
+        val summary = when {
+            passed == total && canRunLiveTest ->
+                "所有可检测权限与本地守护均已生效，点击下方可实测一次模拟广告跳过闭环。"
+            canRunLiveTest ->
+                "基础跳过功能已可用，但仍有 ${total - passed} 项保活设置待补齐，补全后息屏久放更稳。"
+            else ->
+                "请先按上方标黄或标红项完成开启与连接，之后即可点击下方按钮实测跳过效果。"
+        }
+
+        return ConfigAuditReport(
+            passedCount = passed,
+            totalCount = total,
+            headline = headline,
+            summary = summary,
+            canRunLiveTest = canRunLiveTest,
+            items = items
         )
     }
 }

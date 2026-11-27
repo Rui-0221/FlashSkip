@@ -37,6 +37,7 @@ class StatsStore(context: Context) {
         private const val KEY_DISABLED_PKGS = "user_disabled_packages"
         private const val KEY_UI_THEME_MODE = "ui_theme_mode"
         private const val KEY_UI_THEME_STYLE = "ui_theme_style"
+        private const val KEY_OEM_KEEPALIVE_CONFIRMED = "oem_keepalive_confirmed"
         private const val MAX_LATENCY_SAMPLES = 100
     }
 
@@ -98,6 +99,10 @@ class StatsStore(context: Context) {
     var uiThemeStyle: String
         get() = prefs.getString(KEY_UI_THEME_STYLE, "classic") ?: "classic"
         set(value) = prefs.edit().putString(KEY_UI_THEME_STYLE, value).apply()
+
+    var oemKeepAliveConfirmed: Boolean
+        get() = prefs.getBoolean(KEY_OEM_KEEPALIVE_CONFIRMED, false)
+        set(value) = prefs.edit().putBoolean(KEY_OEM_KEEPALIVE_CONFIRMED, value).apply()
 
     fun getUserDisabledPackages(): Set<String> =
         prefs.getStringSet(KEY_DISABLED_PKGS, emptySet())?.toSet() ?: emptySet()

@@ -12,8 +12,8 @@ android {
         applicationId = "com.flashskip"
         minSdk = 26
         targetSdk = 34
-        versionCode = 15
-        versionName = "1.1"
+        versionCode = 16
+        versionName = "1.1.1"
     }
 
     buildTypes {
