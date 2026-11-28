@@ -1,0 +1,40 @@
+1200	2664	1	13449	1	2807
+0	-1	0	android.widget.FrameLayout				0,0,1200,2664	1	0	1
+1	0	1	android.widget.LinearLayout				0,0,1200,2664	1	0	1
+2	1	2	android.widget.FrameLayout	content			0,0,1200,2664	1	0	1
+3	2	3	android.view.ViewGroup				0,0,1200,2664	1	0	1
+4	3	4	android.widget.FrameLayout	flAd			0,0,1200,2369	1	0	1
+5	3	4	android.widget.ImageView	iv_splash_ad_logo			0,2369,1200,2664	1	0	1
+6	3	4	android.widget.TextView	tv_ad_type	D-0		52,2421,123,2474	1	0	1
+7	4	5	android.widget.RelativeLayout				0,0,1200,2369	1	0	1
+8	7	6	android.widget.RelativeLayout				0,0,1200,2369	1	0	1
+9	8	7	android.widget.RelativeLayout	wm_splash_container			0,0,1200,2369	1	0	1
+10	9	8	android.widget.RelativeLayout				0,0,1200,2369	1	0	1
+11	10	9	android.widget.RelativeLayout				0,0,1200,2369	1	0	1
+12	11	10	android.widget.FrameLayout				0,0,1200,2369	1	0	1
+13	11	10	android.view.View				0,0,1,1	1	0	1
+14	11	10	android.widget.LinearLayout	ll_notification			33,43,1167,256	1	0	1
+15	11	10	android.widget.TextView	wm_splash_jump_tv	5 | 跳过		948,399,1168,481	1	1	1
+16	11	10	android.widget.RelativeLayout	wm_splash_interaction_view			0,1607,1200,2133	1	0	1
+17	11	10	android.widget.RelativeLayout				0,2215,1200,2369	1	0	1
+18	11	10	android.view.View	id_18			0,2369,0,2369	0	0	1
+19	12	11	android.widget.ImageView	wm_splash_main_iv			0,0,1200,2369	1	1	1
+20	14	11	android.widget.ImageView	id_20			66,76,213,223	1	0	1
+21	14	11	android.widget.LinearLayout				246,76,1035,207	1	0	1
+22	14	11	android.widget.TextView		刚刚		1068,76,1134,120	1	0	1
+23	16	11	android.widget.RelativeLayout				600,1607,600,1607	0	0	1
+24	16	11	android.widget.RelativeLayout				600,1607,600,1607	0	0	1
+25	16	11	android.widget.RelativeLayout				141,1607,1058,2133	1	0	1
+26	17	11	android.widget.TextView	id_26	文案		33,2248,1011,2336	1	0	1
+27	17	11	android.widget.LinearLayout	layout_ad_logo			1011,2265,1167,2318	1	0	1
+28	21	12	android.widget.TextView	id_28	文案		246,76,430,138	1	0	1
+29	21	12	android.widget.TextView	id_29	文案		246,154,675,207	1	0	1
+30	25	12	android.widget.RelativeLayout	wm_splash_shake_view			488,1607,711,1922	1	1	1
+31	25	12	android.widget.LinearLayout	wm_shake_click_region			141,1955,1058,2133	1	1	1
+32	27	12	android.widget.ImageView	iv_mm_ad_logo			1025,2270,1068,2313	1	0	1
+33	27	12	android.widget.TextView		广告		1075,2265,1153,2318	1	0	1
+34	30	13	android.widget.RelativeLayout	id_34			488,1607,711,1830	1	0	1
+35	30	13	android.widget.TextView	wm_splash_shake_text	摇一摇		515,1846,683,1922	1	0	1
+36	31	13	android.widget.TextView		点击按钮了解更多		326,2006,774,2082	1	0	1
+37	31	13	android.widget.ImageView				774,1962,938,2126	1	0	1
+38	34	14	android.widget.ImageView	id_38			521,1640,678,1797	1	0	1

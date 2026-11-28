@@ -35,6 +35,19 @@ class ForegroundEventsTest {
     private val destination = ForegroundWindow("com.example.destination", 8)
 
     @Test
+    fun `a queued activity hint is usable only for the new verified root within its age limit`() {
+        val events = ForegroundEvents()
+        val next = ForegroundWindow(previous.packageName, previous.id + 1)
+        events.observeRoot(previous, 0)
+        assertTrue(events.acceptsDelayedActivityHint(next, next, 1665))
+        assertFalse(events.acceptsDelayedActivityHint(next, previous, 1665))
+        assertFalse(events.acceptsDelayedActivityHint(next, next, 2501))
+        assertFalse(events.acceptsDelayedActivityHint(next, next, -1))
+        events.observeRoot(next, 2000)
+        assertFalse(events.acceptsDelayedActivityHint(next, next, 1665))
+    }
+
+    @Test
     fun `window signal gets bounded new root probes when foreground is not ready`() {
         val events = ForegroundEvents()
         assertNull(events.observeRoot(previous, 900))

@@ -16,6 +16,14 @@ data class RectBounds(
     val centerX: Float get() = (left + right) / 2f
     val centerY: Float get() = (top + bottom) / 2f
 
+    fun overlaps(other: RectBounds): Boolean =
+        !isEmpty && !other.isEmpty && left < other.right && other.left < right &&
+            top < other.bottom && other.top < bottom
+
+    fun contains(other: RectBounds): Boolean =
+        !other.isEmpty && left <= other.left && top <= other.top &&
+            right >= other.right && bottom >= other.bottom
+
     /**
      * Returns the visible portion clipped inside `[0, screenWidth] x [0, screenHeight]`,
      * or null if completely off-screen or degenerate.
@@ -50,14 +58,12 @@ data class NodeSnapshot(
      * Picks non-blank text first, falling back to non-blank contentDescription.
      * Prevents empty `""` text from masking a valid contentDescription.
      */
-    val effectiveText: String
-        get() = text.trim().ifEmpty { contentDescription.trim() }
+    val effectiveText: String = text.trim().ifEmpty { contentDescription.trim() }
 
     /**
      * Local resource id suffix after `/`, lowercased.
      */
-    val shortId: String
-        get() = viewId.substringAfterLast('/').lowercase()
+    val shortId: String = viewId.substringAfterLast('/').lowercase()
 }
 
 /**
@@ -73,7 +79,10 @@ data class WindowSnapshot(
     val complete: Boolean = true,
     val windowId: Int? = null,
     /** When present, node rectangles are relative to the verified task's logical root. */
-    val freeform: FreeformViewport? = null
+    val freeform: FreeformViewport? = null,
+    /** Higher window bounds in physical screen coordinates. */
+    val obstructions: List<RectBounds> = emptyList(),
+    val behindTopWindow: Boolean = false
 )
 
 /**
@@ -106,7 +115,11 @@ data class MatchDecision(
     val isShakeAd: Boolean,
     val forceGestureOnly: Boolean,
     val targetBounds: RectBounds,
-    val score: Int
+    val score: Int,
+    val bannerNodeIndices: List<Int> = emptyList(),
+    val canClickNode: Boolean = false,
+    val nativeOnly: Boolean = false,
+    val provenStartupAd: Boolean = false
 )
 
 /**
@@ -126,6 +139,7 @@ data class ActionCommand(
 
 sealed interface EvaluationResult {
     data object NoOp : EvaluationResult
+    data object AwaitStableLayout : EvaluationResult
     data class OutOfWindow(val sinceLaunchMs: Long) : EvaluationResult
     data class ObserveDetected(
         val packageName: String,

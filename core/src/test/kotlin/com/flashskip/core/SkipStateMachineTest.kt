@@ -229,6 +229,47 @@ class SkipStateMachineTest {
     }
 
     @Test
+    fun `split countdown can reacquire its native parent after refresh rejects an early layout`() {
+        val sample = splashWindow()
+        val template = sample.nodes.single()
+        val root = template.copy(index = 0, parentIndex = -1, depth = 0, text = "", viewId = "",
+            bounds = RectBounds(0, 0, screenW, screenH), isClickable = false)
+        val anchor = template.copy(index = 1, parentIndex = 0, depth = 1, text = "",
+            viewId = "test:id/closeContainer", bounds = RectBounds(930, 112, 1080, 188))
+        val label = template.copy(index = 2, parentIndex = 1, depth = 2, viewId = "", text = "跳过",
+            bounds = RectBounds(970, 128, 1040, 173), isClickable = false)
+        val marker = label.copy(index = 3, parentIndex = 0, depth = 1, text = "广告",
+            bounds = RectBounds(50, 1800, 100, 1850))
+        val initial = sample.copy(nodes = listOf(root, anchor, label, marker))
+        val machine = SkipStateMachine()
+        machine.onWindowStateChanged(initial.packageName, initial.activityName, true, 1000L)
+        val first = (machine.evaluateSnapshot(initial, 1100L, true, false, 6000L) as EvaluationResult.ExecuteClick).command
+        assertEquals(ClickMethod.NODE_ACTION, first.preferredMethod)
+        val evidence = requireNotNull(TargetEvidence.forNativeReacquisition(initial, first.decision))
+        machine.onActionDispatched(first.sessionId, first.attemptId, ClickMethod.NODE_ACTION, false, evidence)
+
+        val currentLabel = label.copy(bounds = RectBounds(955, 128, 1025, 173))
+        val countdown = label.copy(index = 4, text = "4", bounds = RectBounds(1025, 128, 1045, 173))
+        val movedAnchor = anchor.copy(bounds = RectBounds(908, 112, 1080, 188))
+        val current = initial.copy(nodes = listOf(root, movedAnchor, currentLabel, marker, countdown))
+        val rules = RuleIndex.defaultBuiltin()
+        val decision = requireNotNull(SkipMatcher.findBestMatch(current, rules))
+        assertTrue(decision.forceGestureOnly)
+        assertFalse(evidence.allowsRetry(current.copy(complete = false), currentLabel, decision))
+        assertFalse(evidence.allowsRetry(current.copy(windowId = 9), currentLabel, decision))
+        assertFalse(evidence.allowsRetry(current.copy(nodes = current.nodes + movedAnchor.copy(index = 5)), currentLabel, decision))
+        assertFalse(evidence.allowsRetry(current.copy(nodes = current.nodes.map { if (it == marker) it.copy(text = "") else it }), currentLabel, decision))
+        assertFalse(evidence.allowsRetry(current.copy(obstructions = listOf(movedAnchor.bounds)), currentLabel, decision))
+        assertEquals(EvaluationResult.NoOp, machine.evaluateSnapshot(current, 1120L, true, false, 6000L))
+        assertEquals(EvaluationResult.NoOp, machine.evaluateSnapshot(current, 1150L, true, false, 6000L))
+        val retry = (machine.evaluateSnapshot(current, 1180L, true, false, 6000L) as EvaluationResult.ExecuteClick).command
+        assertEquals(ClickMethod.NODE_ACTION, retry.preferredMethod)
+        assertFalse(retry.allowImmediateGestureFallback)
+        machine.onActionDispatched(retry.sessionId, retry.attemptId, ClickMethod.NODE_ACTION, false, evidence)
+        assertFalse(machine.armed)
+    }
+
+    @Test
     fun `visible ad marker and incomplete absence are different from confirmed absence`() {
         val target = splashWindow().nodes.single().copy(index = 1, parentIndex = 0, depth = 1)
         val root = target.copy(index = 0, parentIndex = -1, className = "android.widget.FrameLayout",
@@ -398,8 +439,11 @@ class SkipStateMachineTest {
         assertTrue(fsm.armed)
         assertEquals(364889L, fsm.launchAtMs)
 
+        val hotAd = splashWindow("com.demo.news", "com.demo.news.HomeActivity")
         val res = fsm.evaluateSnapshot(
-            splashWindow("com.demo.news", "com.demo.news.HomeActivity"),
+            hotAd.copy(nodes = hotAd.nodes + hotAd.nodes.single().copy(
+                index = 1, text = "广告", viewId = "", bounds = RectBounds(20, 2050, 76, 2110), isClickable = false
+            )),
             nowMs = 365100L,
             masterEnabled = true, observeOnly = false, windowMs = 6000L
         )

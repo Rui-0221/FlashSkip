@@ -1159,42 +1159,6 @@
             android:textSize="21sp"
             android:textStyle="bold" />
 
-        <LinearLayout
-            android:id="@+id/cardExperimentalSkip"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
-            android:background="@drawable/ef_panel_bg"
-            android:orientation="vertical"
-            android:padding="18dp">
-
-            <androidx.appcompat.widget.SwitchCompat
-                android:id="@+id/swExperimentalSkip"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:minHeight="48dp"
-                android:text="@string/experimental_skip_title"
-                android:textColor="@color/ef_ink"
-                android:textSize="14.5sp"
-                android:textStyle="bold"
-                android:thumb="@drawable/ef_switch_thumb"
-                app:showText="false"
-                app:switchMinWidth="52dp"
-                app:switchPadding="12dp"
-                app:thumbTint="@null"
-                app:track="@drawable/ef_switch_track"
-                app:trackTint="@null" />
-
-            <TextView
-                android:id="@+id/tvExperimentalSkipStatus"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:accessibilityLiveRegion="polite"
-                android:text="@string/experimental_skip_off"
-                android:textColor="@color/ef_ink_2"
-                android:textSize="13sp" />
-        </LinearLayout>
-
         <!-- 1. Appearance Card (Tri-Style + Light/Dark Mode) -->
         <LinearLayout
             android:id="@+id/cardAppearance"

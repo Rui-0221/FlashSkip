@@ -13,8 +13,11 @@ object SnapshotJson {
         append("  \"screenWidth\": ").append(snapshot.screenWidth).append(",\n")
         append("  \"screenHeight\": ").append(snapshot.screenHeight).append(",\n")
         append("  \"isFullScreen\": ").append(snapshot.isFullScreen).append(",\n")
+        append("  \"windowId\": ").append(snapshot.windowId).append(",\n")
+        append("  \"complete\": ").append(snapshot.complete).append(",\n")
+        append("  \"behindTopWindow\": ").append(snapshot.behindTopWindow).append(",\n")
+        append("  \"obstructions\": ").append(snapshot.obstructions.joinToString(prefix = "[", postfix = "]") { rect(it) }).append(",\n")
         snapshot.freeform?.let { viewport ->
-            append("  \"windowId\": ").append(snapshot.windowId).append(",\n")
             append("  \"freeform\": {\"frame\": ").append(rect(viewport.frame))
             append(", \"nodeRoot\": ").append(rect(viewport.nodeRoot))
             append(", \"captionId\": ").append(viewport.captionId)

@@ -9,7 +9,8 @@ data class FreeformViewport(
     val nodeRoot: RectBounds,
     val captionId: Int,
     val caption: RectBounds,
-    val obstructions: List<RectBounds>
+    val obstructions: List<RectBounds>,
+    val display: RectBounds? = null
 ) {
     fun local(rect: RectBounds) = RectBounds(
         rect.left - nodeRoot.left, rect.top - nodeRoot.top,
@@ -22,16 +23,29 @@ data class FreeformViewport(
         fun x(v: Int) = frame.left + (v * frame.width.toDouble() / nodeRoot.width).roundToInt()
         fun y(v: Int) = frame.top + (v * frame.height.toDouble() / nodeRoot.height).roundToInt()
         val target = RectBounds(x(local.left), y(local.top), x(local.right), y(local.bottom))
-        if (target.isEmpty || caption.containsCenter(target) || obstructions.any { it.containsCenter(target) }) return null
-        return target
+        val clipped = display?.let {
+            RectBounds(maxOf(target.left, it.left), maxOf(target.top, it.top),
+                minOf(target.right, it.right), minOf(target.bottom, it.bottom))
+        } ?: target
+        val visible = if (caption.overlaps(clipped)) {
+            if (caption.bottom - clipped.top > clipped.height * .20f) return null
+            clipped.copy(top = caption.bottom)
+        } else clipped
+        if (visible.width < 12 || visible.height < 12 || visible.area * 2 < target.area ||
+            obstructions.any { it.overlaps(visible) }) return null
+        return visible
     }
 
     fun sameTask(other: FreeformViewport?) = other != null && captionId == other.captionId && frame == other.frame
 
     companion object {
         fun aligned(frame: RectBounds, root: RectBounds, width: Int, height: Int): Boolean {
-            if (frame.isEmpty || root.isEmpty || frame.clippedToScreen(width, height) != frame ||
+            if (frame.isEmpty || root.isEmpty || frame.top < 0 || frame.bottom > height ||
                 abs(frame.left - root.left) > 2 || abs(frame.top - root.top) > 2) return false
+            val visible = frame.clippedToScreen(width, height) ?: return false
+            // A parked task may retain the same horizontal overhang after being resized.
+            // Visibility of the actual input rectangle is checked separately by screenTarget.
+            if (visible.width < frame.width * .85f) return false
             val sx = frame.width.toDouble() / root.width
             val sy = frame.height.toDouble() / root.height
             return sx in 0.25..1.02 && sy in 0.25..1.02 &&

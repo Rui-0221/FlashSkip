@@ -14,6 +14,9 @@ internal fun AccessibilityEvent.mayChangeForeground(): Boolean {
     return windowChanges and changes != 0
 }
 
+internal fun AccessibilityEvent.changesWindowGeometry(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P &&
+    windowChanges and (AccessibilityEvent.WINDOWS_CHANGE_BOUNDS or AccessibilityEvent.WINDOWS_CHANGE_LAYER) != 0
+
 internal fun AccessibilityWindowInfo.isFocusedApp(): Boolean =
     isFocused && type == AccessibilityWindowInfo.TYPE_APPLICATION && id >= 0 &&
         (Build.VERSION.SDK_INT < Build.VERSION_CODES.R || displayId == Display.DEFAULT_DISPLAY)
@@ -36,16 +39,6 @@ internal fun List<AccessibilityWindowInfo>.readFocusedUnmapped(expected: Foregro
         }
     } finally {
         forEach { it.recycle() }
-    }
-}
-
-@Suppress("DEPRECATION")
-internal fun AccessibilityNodeInfo.hasOrdinaryWindow(): Boolean {
-    val owner = runCatching { window }.getOrNull() ?: return false
-    return try {
-        owner.type == AccessibilityWindowInfo.TYPE_APPLICATION
-    } finally {
-        owner.recycle()
     }
 }
 

@@ -33,7 +33,6 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.appcompat.widget.SwitchCompat
-import com.flashskip.experimental.ExperimentalSkip
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
@@ -132,9 +131,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var swMaster: SwitchCompat
     private lateinit var tvMasterSummary: TextView
     private lateinit var swSkipToast: SwitchCompat
-    private lateinit var swExperimentalSkip: SwitchCompat
-    private lateinit var tvExperimentalSkipStatus: TextView
-    private lateinit var cardExperimentalSkip: View
     private lateinit var tvSkipToastDesc: TextView
 
     private lateinit var homeKeepAliveCard: View
@@ -496,9 +492,6 @@ class MainActivity : AppCompatActivity() {
         swMaster = findViewById(R.id.swMaster)
         tvMasterSummary = findViewById(R.id.tvMasterSummary)
         swSkipToast = findViewById(R.id.swSkipToast)
-        swExperimentalSkip = findViewById(R.id.swExperimentalSkip)
-        tvExperimentalSkipStatus = findViewById(R.id.tvExperimentalSkipStatus)
-        cardExperimentalSkip = findViewById(R.id.cardExperimentalSkip)
         tvSkipToastDesc = findViewById(R.id.tvSkipToastDesc)
 
         homeKeepAliveCard = findViewById(R.id.homeKeepAliveCard)
@@ -825,7 +818,7 @@ class MainActivity : AppCompatActivity() {
         val mainPanels = listOf(
             serviceStatusPanel, cardHomeControls, homeKeepAliveCard, telemetryPanel,
             cardKaChecklist, keepAliveGuideCard, sectionExclusions, cardAppearance,
-            cardPrivacySafety, cardExperimentalSkip, advancedToolsCard
+            cardPrivacySafety, advancedToolsCard
         )
         mainPanels.forEach { panel ->
             when {
@@ -859,7 +852,7 @@ class MainActivity : AppCompatActivity() {
         val pad18 = (18f * density).toInt()
         val paddedPanels = listOf(
             serviceStatusPanel, homeKeepAliveCard, telemetryPanel, cardKaChecklist,
-            keepAliveGuideCard, sectionExclusions, cardAppearance, cardPrivacySafety, cardExperimentalSkip
+            keepAliveGuideCard, sectionExclusions, cardAppearance, cardPrivacySafety
         )
         when {
             endfield -> {
@@ -892,7 +885,7 @@ class MainActivity : AppCompatActivity() {
             tvStatsCardPrivate, tvStatTodayLabel, tvStatTotalLabel, tvDescKeepAlive,
             tvKaA11yDesc, tvKaNotifDesc, tvKaBatteryDesc, tvKaBgDesc, tvKeepAliveGuideDesc,
             tvKeepAliveInfo, tvBuiltInExclusions, tvAppearanceDesc, tvStyleActiveDesc,
-            tvSafetyGuide, tvAdvancedSub, tvStatSampleCount, tvStats, tvLogMeta, tvExperimentalSkipStatus
+            tvSafetyGuide, tvAdvancedSub, tvStatSampleCount, tvStats, tvLogMeta
         ).forEach { it.setTextColor(p.ink2) }
 
         // Hairline / cat-whisker dividers
@@ -945,7 +938,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Switches & SeekBar
-        listOf(swMaster, swSkipToast, swExperimentalSkip, swObserve, swDiag).forEach { sw ->
+        listOf(swMaster, swSkipToast, swObserve, swDiag).forEach { sw ->
             sw.setTextColor(p.ink)
             when {
                 endfield -> {
@@ -1086,7 +1079,6 @@ class MainActivity : AppCompatActivity() {
         syncingSwitches = true
         swMaster.isChecked = statsStore.masterEnabled
         swSkipToast.isChecked = statsStore.skipToastEnabled
-        swExperimentalSkip.isChecked = statsStore.experimentalSkipEnabled
         swObserve.isChecked = statsStore.observeOnly
         swDiag.isChecked = statsStore.diagNodes
         syncingSwitches = false
@@ -1103,11 +1095,6 @@ class MainActivity : AppCompatActivity() {
             statsStore.skipToastEnabled = checked
             SkipLog.log("SETTING skip_toast=$checked")
             showToast(if (checked) "已开启跳过成功轻提示" else "已关闭跳过成功轻提示")
-        }
-        swExperimentalSkip.setOnCheckedChangeListener { _, checked ->
-            if (syncingSwitches) return@setOnCheckedChangeListener
-            ExperimentalSkip.setEnabled(checked)
-            refreshUi(forceLog = false)
         }
         swObserve.setOnCheckedChangeListener { _, checked ->
             if (syncingSwitches) return@setOnCheckedChangeListener
@@ -1879,7 +1866,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        ExperimentalSkip.refresh()
         SkipAdService.refreshForegroundProtection()
         handler.post(refresh)
         if (!SkipAdService.connected) {
@@ -1979,26 +1965,11 @@ class MainActivity : AppCompatActivity() {
             if (swObserve.isChecked != observeOnly) swObserve.isChecked = observeOnly
             val skipToastOn = statsStore.skipToastEnabled
             if (swSkipToast.isChecked != skipToastOn) swSkipToast.isChecked = skipToastOn
-            if (swExperimentalSkip.isChecked != statsStore.experimentalSkipEnabled) {
-                swExperimentalSkip.isChecked = statsStore.experimentalSkipEnabled
-            }
             val diagOn = statsStore.diagNodes
             if (swDiag.isChecked != diagOn) swDiag.isChecked = diagOn
         } finally {
             syncingSwitches = false
         }
-
-        val experimentalText = getString(when (ExperimentalSkip.status) {
-            ExperimentalSkip.Status.OFF -> R.string.experimental_skip_off
-            ExperimentalSkip.Status.PAUSED -> R.string.experimental_skip_paused
-            ExperimentalSkip.Status.MISSING -> R.string.experimental_skip_missing
-            ExperimentalSkip.Status.DISCONNECTED -> R.string.experimental_skip_disconnected
-            ExperimentalSkip.Status.UNAUTHORIZED -> R.string.experimental_skip_unauthorized
-            ExperimentalSkip.Status.CONNECTING -> R.string.experimental_skip_connecting
-            ExperimentalSkip.Status.ACTIVE -> R.string.experimental_skip_active
-            ExperimentalSkip.Status.UNAVAILABLE -> R.string.experimental_skip_unavailable
-        })
-        if (tvExperimentalSkipStatus.text != experimentalText) tvExperimentalSkipStatus.text = experimentalText
 
         // Top Header Status Pill
         val headerStatus = ConsoleFormatter.headerStatus(status, observeOnly)

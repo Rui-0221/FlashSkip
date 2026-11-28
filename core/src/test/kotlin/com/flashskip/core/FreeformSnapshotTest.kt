@@ -51,6 +51,33 @@ class FreeformSnapshotTest {
         assertTrue(evaluate(snapshot) is EvaluationResult.ExecuteClick)
     }
 
+    @Test fun slightlyParkedTaskKeepsControlsWithEnoughVisibleArea() {
+        val parked = RectBounds(-24, 807, 817, 2174)
+        val rootBounds = RectBounds(-23, 807, 817, 2174)
+        val parkedViewport = FreeformViewport(parked, rootBounds, 10854,
+            RectBounds(-23, 807, 817, 892), emptyList())
+        val close = button.copy(text = "跳过", viewId = "", isClickable = false,
+            bounds = parkedViewport.local(RectBounds(664, 925, 719, 963)))
+        val replay = snapshot.copy(windowId = 10856, freeform = parkedViewport,
+            nodes = listOf(root.copy(bounds = parkedViewport.local(rootBounds)), close))
+        assertEquals(close.index, match(replay)?.targetNodeIndex)
+        val clipped = close.copy(bounds = RectBounds(4, 120, 55, 158))
+        assertEquals(clipped.index, match(replay.copy(nodes = listOf(replay.nodes[0], clipped)))?.targetNodeIndex)
+        assertNull(match(replay.copy(nodes = listOf(replay.nodes[0], clipped.copy(bounds = RectBounds(4, 120, 39, 158))))))
+        val tooFar = parked.copy(left = -155, right = 686)
+        assertFalse(FreeformViewport.aligned(tooFar, tooFar, 1200, 2664))
+    }
+
+    @Test fun parkAfterResizeRetainsTheVerifiedViewport() {
+        val frame = RectBounds(-64, 951, 680, 2161)
+        val viewport = FreeformViewport(frame, frame.copy(left = -63), 7,
+            RectBounds(-63, 951, 680, 1028), emptyList(), RectBounds(0, 0, 1200, 2664))
+        assertTrue(FreeformViewport.aligned(frame, viewport.nodeRoot, 1200, 2664))
+        assertEquals(RectBounds(0, 1751, 69, 1833), viewport.screenTarget(RectBounds(41, 800, 133, 882)))
+        assertNull(viewport.screenTarget(RectBounds(15, 800, 85, 882)))
+        assertNull(viewport.screenTarget(RectBounds(120, 20, 182, 90)))
+    }
+
     @Test fun retryComparesBothCoordinateBasesAndRequiresTheSameTask() {
         val evidence = TargetEvidence(snapshot, match(snapshot)!!, allowBoundedMovement = true)
         val scaled = viewport.copy(nodeRoot = frame)

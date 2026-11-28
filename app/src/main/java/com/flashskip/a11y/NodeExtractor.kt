@@ -136,7 +136,9 @@ object NodeExtractor {
                 nodes = snapshots,
                 complete = complete && queue.isEmpty(),
                 windowId = root.windowId.takeIf { it >= 0 },
-                freeform = surface.freeform
+                freeform = surface.freeform,
+                obstructions = surface.obstructions,
+                behindTopWindow = surface.behindTopWindow
             )
             return ExtractedTree(win, natives)
         } catch (e: Exception) {

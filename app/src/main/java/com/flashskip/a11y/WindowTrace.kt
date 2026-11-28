@@ -7,8 +7,12 @@ import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
+import com.flashskip.core.PackagePolicy
 import com.flashskip.core.RuleIndex
 import com.flashskip.core.SkipMatcher
+import com.flashskip.core.SnapshotJson
+import com.flashskip.core.WindowSnapshot
+import java.io.PrintWriter
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -80,6 +84,56 @@ internal class WindowTrace(private val engine: String) {
             }
         } finally {
             windows.forEach { it.recycle() }
+        }
+    }
+
+    fun dumpEvidence(writer: PrintWriter, width: Int, height: Int, windows: List<AccessibilityWindowInfo>) {
+        try {
+            for (window in windows) {
+                val before = SystemClock.uptimeMillis()
+                val root = runCatching {
+                    if (Build.VERSION.SDK_INT >= 33) window.getRoot(0) else window.root
+                }.getOrNull()
+                val owner = root?.packageName?.toString().orEmpty()
+                val frame = window.screenRect()
+                val display = if (Build.VERSION.SDK_INT >= 30) window.displayId else 0
+                writer.println("EVIDENCE t=$before id=${window.id} type=${window.type} layer=${window.layer} " +
+                    "display=$display focused=${window.isFocused} active=${window.isActive} pkg=${alias(owner)} " +
+                    "hasRoot=${root != null} frame=${frame.left},${frame.top},${frame.right},${frame.bottom}")
+                if (root == null) continue
+                if (PackagePolicy.isExcludedPackage(owner)) {
+                    root.recycle()
+                    continue
+                }
+                runCatching {
+                    NodeExtractor.extract(root, "", width, height).use { tree ->
+                        writer.println("TREE")
+                        writer.println(SnapshotJson.toJson(tree.snapshot))
+                        writer.println("END_TREE")
+                    }
+                }.onFailure { writer.println("TREE_UNAVAILABLE") }
+            }
+        } finally {
+            windows.forEach { it.recycle() }
+        }
+    }
+
+    private data class ActionSnapshot(val session: Long, val attempt: Long, val uptime: Long, val tree: WindowSnapshot)
+    private val actionSnapshots = ArrayDeque<ActionSnapshot>()
+
+    fun recordActionSnapshot(session: Long, attempt: Long, uptime: Long, tree: WindowSnapshot) {
+        synchronized(actionSnapshots) {
+            if (actionSnapshots.size == 8) actionSnapshots.removeFirst()
+            actionSnapshots.addLast(ActionSnapshot(session, attempt, uptime, tree))
+        }
+    }
+
+    fun dumpActionSnapshots(writer: PrintWriter) {
+        val snapshots = synchronized(actionSnapshots) { actionSnapshots.toList() }
+        for ((session, attempt, uptime, tree) in snapshots) {
+            writer.println("ACTION_TREE session=$session attempt=$attempt uptime=$uptime")
+            writer.println(SnapshotJson.toJson(tree))
+            writer.println("END_TREE")
         }
     }
 

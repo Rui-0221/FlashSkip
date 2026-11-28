@@ -9,14 +9,17 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.ApplicationInfo
 import android.content.pm.ServiceInfo
 import android.graphics.Rect
 import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.PowerManager
+import android.os.Process
 import android.os.SystemClock
 import android.util.DisplayMetrics
+import android.util.Log
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
@@ -27,16 +30,17 @@ import com.flashskip.a11y.ActionExecutor
 import com.flashskip.a11y.SkipTrace
 import com.flashskip.a11y.WindowTrace
 import com.flashskip.a11y.hasVisibleNode
-import com.flashskip.a11y.hasOrdinaryWindow
 import com.flashskip.a11y.isFocusedApp
 import com.flashskip.a11y.ApplicationWindows
+import com.flashskip.a11y.ContentWindowRoot
+import com.flashskip.a11y.isFreshGestureRetry
 import com.flashskip.a11y.ExtractedTree
 import com.flashskip.core.RectBounds
 import com.flashskip.a11y.mayChangeForeground
+import com.flashskip.a11y.changesWindowGeometry
 import com.flashskip.a11y.readFocusedUnmapped
 import com.flashskip.a11y.showsReturnTo
 import com.flashskip.a11y.withFocusedAppWindow
-import com.flashskip.experimental.ExperimentalSkip
 import com.flashskip.a11y.NodeExtractor
 import com.flashskip.core.EvaluationResult
 import com.flashskip.core.ForegroundEvents
@@ -55,6 +59,8 @@ import com.flashskip.core.VerifyOutcome
 import com.flashskip.data.SkipLog
 import com.flashskip.data.StatsStore
 import com.flashskip.ui.SkipSuccessFeedback
+import java.io.FileDescriptor
+import java.io.PrintWriter
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
@@ -83,20 +89,21 @@ class SkipAdService : AccessibilityService() {
             activeService?.updateForegroundProtection()
         }
 
-        internal fun onActionSourceChanged() {
-            activeService?.resetPendingWork("action_source_changed")
-        }
-
         private const val FIRST_PROBE_MS = 24L
         private const val PROBE_INTERVAL_MS = 24L
-        private const val NODE_RETRY_MS = 85L
+        private const val TARGET_RETRY_MS = 125L
+        private const val RELAYOUT_PROBE_MS = 32L
         private const val GESTURE_CALLBACK_TIMEOUT_MS = 750L
-        private const val LEGACY_FRESH_VERIFY_BUDGET_MS = 120L
+        private const val FRESH_VERIFY_BUDGET_MS = 120L
         private const val MAX_VERIFY_NODES = 400
         private const val WINDOW_STATE_MAX_AGE_MS = 400L
+        private val MATCH_TREE_PREFETCH = AccessibilityNodeInfo.FLAG_PREFETCH_DESCENDANTS_BREADTH_FIRST or
+            AccessibilityNodeInfo.FLAG_PREFETCH_UNINTERRUPTIBLE
+        private const val STACKED_WINDOW_STATE_MAX_AGE_MS = 1500L
         private const val STARTUP_RECOVERY_MS = 1800L
         private val STARTUP_PROBE_OFFSETS_MS = longArrayOf(0, 60, 160, 340, 650, 950, 1250, 1580)
         private const val DIAG_THROTTLE_MS = 2500L
+        private const val EVIDENCE_TAG = "FlashSkipEvidence"
         internal const val NOTIFICATION_CHANNEL_ID = "flashskip_keepalive"
         private const val NOTIF_ID = 1001
         private const val ACTION_PAUSE = "com.flashskip.action.PAUSE_AUTO_SKIP"
@@ -114,14 +121,18 @@ class SkipAdService : AccessibilityService() {
         val pkg: String,
         val windowId: Int,
         val timestampMs: Long,
+        val receivedAtMs: Long,
         val admittedDuringStartup: Boolean = false,
-        val unarmedContentCheck: Boolean = false
+        val unarmedContentCheck: Boolean = false,
+        val offeredSourceRoot: Boolean = false
     )
     private data class PendingRetry(
         val sessionId: Long,
         val origin: TargetEvidence,
-        val eventAtMs: Long?
+        val event: InputOrigin?
     )
+
+    private data class InputOrigin(val eventAtMs: Long, val receivedAtMs: Long, val windowId: Int, val type: String)
 
     private data class ObservedAttempt(
         val command: ActionCommand,
@@ -132,7 +143,7 @@ class SkipAdService : AccessibilityService() {
         val actionAtMs: Long,
         val inputStartedAtMs: Long?,
         val inputReturnedAtMs: Long?,
-        val eventAtMs: Long?,
+        val event: InputOrigin?,
         val matchUs: Long,
         val labTrace: TestSplashActivity.RunTrace? = null,
         val returnWindow: ForegroundWindow? = null,
@@ -140,7 +151,9 @@ class SkipAdService : AccessibilityService() {
         val closure: ClosureCheck = evidence.closureCheck(inputStartedAtMs ?: actionAtMs),
         var lastProbeMs: Long = Long.MIN_VALUE / 2,
         var gestureCompletedAtMs: Long? = null
-    )
+    ) {
+        val eventAtMs: Long? get() = event?.eventAtMs
+    }
 
     private val pendingWindowStates = ConcurrentLinkedQueue<WindowStatePayload>()
     private val windowStates = LinkedHashMap<ForegroundWindow, WindowStatePayload>()
@@ -149,6 +162,7 @@ class SkipAdService : AccessibilityService() {
     private val pendingWindowCheck = AtomicBoolean(false)
     private val pendingContentScan = AtomicBoolean(false)
     private val scanEvent = AtomicReference<ScanEvent?>()
+    private val geometryEvent = AtomicReference<InputOrigin?>()
     private val drainScheduled = AtomicBoolean(false)
 
     @Volatile
@@ -177,8 +191,13 @@ class SkipAdService : AccessibilityService() {
     private var lastDiagDumpAt = 0L
     private var lastRootLookupNoteAt = 0L
     private var tracedScanSession = -1L
+    private var tracedNotificationWindow: ForegroundWindow? = null
+    private var tracedNotificationSession = -1L
+    private var tracedNotificationCandidate: ForegroundWindow? = null
+    private var tracedNotificationCandidateSession = -1L
     private val appWindows by lazy { ApplicationWindows(this) { windows } }
-    private val windowTrace = WindowTrace("legacy")
+    private val contentWindowRoot = ContentWindowRoot()
+    private val windowTrace = WindowTrace("accessibility")
     private var pendingAttempt: ObservedAttempt? = null
     private var pendingRetry: PendingRetry? = null
     private val startupProbe = Runnable {
@@ -190,6 +209,12 @@ class SkipAdService : AccessibilityService() {
     private val windowProbe = Runnable {
         if (canScan()) {
             pendingWindowCheck.set(true)
+            scheduleDrain()
+        }
+    }
+    private val relayoutProbe = Runnable {
+        if (canScan() && stateMachine.armed) {
+            pendingContentScan.set(true)
             scheduleDrain()
         }
     }
@@ -239,7 +264,7 @@ class SkipAdService : AccessibilityService() {
         if (worker == null) {
             statsStore = StatsStore(this)
             stateMachine = SkipStateMachine(ruleIndex = ruleIndex)
-            val thread = HandlerThread("SkipAdWorker").apply { start() }
+            val thread = HandlerThread("SkipAdWorker", Process.THREAD_PRIORITY_FOREGROUND).apply { start() }
             workerThread = thread
             worker = Handler(thread.looper)
         }
@@ -268,7 +293,7 @@ class SkipAdService : AccessibilityService() {
     }
 
     private fun canScan(): Boolean =
-        activeService === this && !screenSuspended && statsStore.masterEnabled && ExperimentalSkip.allowsLegacy()
+        activeService === this && !screenSuspended && statsStore.masterEnabled
 
     private fun isInteractiveAndUnlocked(): Boolean =
         getSystemService(PowerManager::class.java)?.isInteractive == true &&
@@ -305,6 +330,7 @@ class SkipAdService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
         val w = worker ?: return
         if (activeService !== this || !statsStore.masterEnabled) return
+        val receivedAt = SystemClock.uptimeMillis()
         // Some ROMs omit a wake/unlock broadcast. A window transition provides an event-driven fallback.
         if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED ||
             event.eventType == AccessibilityEvent.TYPE_WINDOWS_CHANGED
@@ -328,16 +354,22 @@ class SkipAdService : AccessibilityService() {
                         WindowStatePayload(pkg, cls, full, event.eventTime, event.windowId)
                     )
                 }
-                scanEvent.set(ScanEvent(pkg, event.windowId, event.eventTime))
+                scanEvent.set(ScanEvent(pkg, event.windowId, event.eventTime, receivedAt))
                 pendingContentScan.set(true)
                 scheduleDrain(w)
             }
 
             AccessibilityEvent.TYPE_WINDOWS_CHANGED -> {
-                if (!event.mayChangeForeground()) return
-                pendingForegroundSignal.set(true)
-                pendingWindowCheck.set(true)
+                if (event.mayChangeForeground()) {
+                    pendingForegroundSignal.set(true)
+                    pendingWindowCheck.set(true)
+                } else if (!isArmedFast || !event.changesWindowGeometry()) {
+                    return
+                }
                 if (isArmedFast) {
+                    if (event.changesWindowGeometry() && event.windowId >= 0) {
+                        geometryEvent.set(InputOrigin(event.eventTime, receivedAt, event.windowId, "geometry"))
+                    }
                     pendingContentScan.set(true)
                 }
                 scheduleDrain(w)
@@ -350,8 +382,10 @@ class SkipAdService : AccessibilityService() {
                     !PackagePolicy.isExcludedPackage(identity.packageName) &&
                     foregroundEvents.reserveUnarmedContent(identity, SystemClock.uptimeMillis())
                 if (!isArmedFast && !admittedDuringStartup && !unarmedCheck) return
+                val offeredSourceRoot = isArmedFast && contentWindowRoot.offer(event, identity)
                 scanEvent.set(ScanEvent(
-                    identity.packageName, identity.id, event.eventTime, admittedDuringStartup, unarmedCheck
+                    identity.packageName, identity.id, event.eventTime, receivedAt,
+                    admittedDuringStartup, unarmedCheck, offeredSourceRoot
                 ))
                 pendingContentScan.set(true)
                 scheduleDrain(w)
@@ -378,10 +412,12 @@ class SkipAdService : AccessibilityService() {
     private fun processPendingOnWorker() {
         val epoch = workerEpoch
         if (epoch != workEpoch || !canScan()) return
+        val workerAt = SystemClock.uptimeMillis()
         val shouldCheckWindows = pendingWindowCheck.getAndSet(false)
         val shouldScan = pendingContentScan.getAndSet(false)
         val foregroundSignal = pendingForegroundSignal.getAndSet(false)
         val source = scanEvent.get()
+        val geometry = geometryEvent.getAndSet(null)
         val disabledPkgs = statsStore.getUserDisabledPackages()
         val recovering = inStartupRecovery()
         val labActivity = TestSplashActivity::class.java.name
@@ -396,12 +432,23 @@ class SkipAdService : AccessibilityService() {
         }
         if (!shouldScan && !shouldCheckWindows) return
 
-        if (foregroundSignal) foregroundEvents.onForegroundSignal(now)
+        if (foregroundSignal) {
+            contentWindowRoot.clear()
+            foregroundEvents.onForegroundSignal(now)
+        }
         val checkingForeground = shouldCheckWindows || hadState || source?.unarmedContentCheck == true
         val unmapped = expectedUnmapped(now)
-        val root = activeApplicationRoot(rootOnly = checkingForeground || recovering)
+        val matchingScan = shouldScan && stateMachine.armed && !checkingForeground && !recovering
+        val sourceRoot = source?.takeIf { matchingScan && it.offeredSourceRoot && it.pkg == stateMachine.activePackage }?.let {
+            contentWindowRoot.acquire(ForegroundWindow(it.pkg, it.windowId), it.timestampMs, MATCH_TREE_PREFETCH)
+        }
+        val root = sourceRoot?.node ?: activeApplicationRoot(
+            rootOnly = checkingForeground || recovering, prefetchForMatch = matchingScan
+        )
+        val rootAt = SystemClock.uptimeMillis()
         if (root == null) {
-            if (shouldCheckWindows || hadState) SkipTrace.log("legacy") { "phase=root result=unavailable" }
+            contentWindowRoot.clear()
+            if (shouldCheckWindows || hadState) SkipTrace.log("accessibility") { "phase=root result=unavailable" }
             updateWindowProbe(null)
             if (recovering && shouldCheckWindows) SkipLog.log("STARTUP_PROBE phase=root result=unavailable")
             cancelPendingRetry("foreground_unavailable")
@@ -409,7 +456,7 @@ class SkipAdService : AccessibilityService() {
         }
         val pkg = root.packageName?.toString().orEmpty()
         val identity = ForegroundWindow(pkg, root.windowId)
-        if (shouldCheckWindows || hadState) SkipTrace.log("legacy") {
+        if (shouldCheckWindows || hadState) SkipTrace.log("accessibility") {
             "phase=root result=available samePackage=${pkg == stateMachine.activePackage} " +
                 "sameWindow=${identity == foregroundEvents.verifiedWindow} armed=${stateMachine.armed}"
         }
@@ -441,19 +488,39 @@ class SkipAdService : AccessibilityService() {
         }
         val (screenW, screenH) = getScreenSize()
         val surface = appWindows.inspect(root, screenW, screenH, unmapped)
+        val surfaceAt = SystemClock.uptimeMillis()
         if (surface == null) {
+            contentWindowRoot.clear()
+            if (checkingForeground) SkipTrace.log("accessibility") { "phase=surface result=unverified windowId=${identity.id}" }
             safeRecycle(root)
             updateWindowProbe(null)
             cancelPendingRetry("unverified_app_window")
             return
         }
-        val state = windowStates.remove(identity)
+        val hint = windowStates.remove(identity)
+        val hintAge = hint?.let { now - it.timestampMs } ?: Long.MAX_VALUE
+        val verifiedActivity = if (hint != null || surface.freeform != null) appWindows.verifiedActivity(identity) else null
+        val floatingLaunch = hint != null && surface.freeform != null && !surface.behindTopWindow &&
+            !stateMachine.isLaunchWindow(identity) && hintAge in 0..ForegroundEvents.DELAYED_ACTIVITY_HINT_MAX_AGE_MS &&
+            surface.ordinaryApplication && verifiedActivity == hint.cls
+        val delayedActivity = hint != null && hintAge > WINDOW_STATE_MAX_AGE_MS && !surface.behindTopWindow &&
+            surface.ordinaryApplication && verifiedActivity == hint.cls &&
+            (floatingLaunch || surface.freeform == null &&
+                foregroundEvents.acceptsDelayedActivityHint(ForegroundWindow(hint.pkg, hint.windowId), identity, hintAge) &&
+                isCredibleFullScreenActivity(root, hint, labActivity))
+        val state = hint?.takeIf {
+            hintAge in 0..WINDOW_STATE_MAX_AGE_MS ||
+                surface.behindTopWindow && hintAge in 0..STACKED_WINDOW_STATE_MAX_AGE_MS || delayedActivity
+        }
+        if (delayedActivity) SkipTrace.log("accessibility") {
+            "phase=window_hint result=delayed_activity windowId=${identity.id} ageMs=$hintAge"
+        }
         val focusedApp = (checkingForeground || pkg != stateMachine.activePackage) &&
             !PackagePolicy.isTransientOverlay(pkg, state?.cls.orEmpty(), state?.isFullScreen ?: true)
         val enteredForeground = focusedApp &&
             foregroundEvents.recordFocusedApplication(identity)
         if (focusedApp && identity != foregroundEvents.verifiedWindow && !stateMachine.armed &&
-            !PackagePolicy.isExcludedPackage(pkg, disabledPkgs) && root.hasOrdinaryWindow()) {
+            !PackagePolicy.isExcludedPackage(pkg, disabledPkgs) && surface.ordinaryApplication) {
             @Suppress("DEPRECATION")
             val copy = AccessibilityNodeInfo.obtain(root)
             NodeExtractor.extract(copy, "", screenW, screenH, maxNodes = MAX_VERIFY_NODES, surface = surface).use {
@@ -463,13 +530,14 @@ class SkipAdService : AccessibilityService() {
             }
         }
         val newFloatingWindow = surface.freeform != null && identity != foregroundEvents.verifiedWindow
-        val recoveredLab = pkg == packageName && (newFloatingWindow ||
+        val recoveredLab = pkg == packageName && (newFloatingWindow || surface.behindTopWindow ||
             state == null && (recovering || enteredForeground)) &&
             root.hasVisibleNode("$packageName:id/splashRoot")
         updateWindowProbe(identity.takeIf { !checkingForeground || focusedApp })
-        if (enteredForeground) SkipTrace.log("legacy") { "phase=foreground result=package_transition" }
-        val moved = focusedApp && stateMachine.moveWithinResume(identity, SystemClock.uptimeMillis(), statsStore.windowMs, enteredForeground)
-        if (moved) SkipTrace.log("legacy") { "phase=window_switch session=${stateMachine.sessionId} kind=resume windowId=${identity.id}" }
+        if (enteredForeground) SkipTrace.log("accessibility") { "phase=foreground result=package_transition" }
+        val moved = focusedApp && !floatingLaunch &&
+            stateMachine.moveWithinResume(identity, SystemClock.uptimeMillis(), statsStore.windowMs, enteredForeground)
+        if (moved) SkipTrace.log("accessibility") { "phase=window_switch session=${stateMachine.sessionId} kind=resume windowId=${identity.id}" }
         if (!moved && (state != null || recoveredLab || enteredForeground || pkg != stateMachine.activePackage &&
             (!checkingForeground || focusedApp))) {
             val previousSession = stateMachine.sessionId
@@ -477,26 +545,27 @@ class SkipAdService : AccessibilityService() {
             val hintedAt = source?.takeIf {
                 it.pkg == pkg && it.windowId == root.windowId &&
                     it.timestampMs in (observedAt - STARTUP_RECOVERY_MS)..observedAt
-            }?.timestampMs
+            }?.timestampMs ?: state?.timestampMs?.takeIf { surface.behindTopWindow }
             val className = when {
                 recoveredLab -> labActivity
                 state != null -> state.cls
                 enteredForeground && pkg == stateMachine.activePackage -> stateMachine.activeActivity
-                surface.freeform != null -> appWindows.verifiedActivity(identity).orEmpty()
+                surface.freeform != null -> verifiedActivity.orEmpty()
                 else -> ""
             }
             stateMachine.onWindowStateChanged(
                 pkg, className, state?.isFullScreen ?: true,
-                if (enteredForeground) observedAt else state?.timestampMs ?: hintedAt ?: observedAt,
+                if (enteredForeground && !delayedActivity) observedAt else state?.timestampMs ?: hintedAt ?: observedAt,
                 userDisabledPackages = disabledPkgs,
                 selfTestPackage = packageName,
                 selfTestActivity = labActivity,
                 windowId = identity.id,
                 confirmedFullscreenActivity = recoveredLab || state != null &&
                     (surface.freeform != null || isCredibleFullScreenActivity(root, state, labActivity)),
-                confirmedForegroundEntry = enteredForeground
+                confirmedForegroundEntry = enteredForeground,
+                confirmedFloatingWindow = floatingLaunch
             )
-            if (previousSession != stateMachine.sessionId) SkipTrace.log("legacy") {
+            if (previousSession != stateMachine.sessionId) SkipTrace.log("accessibility") {
                 "phase=window session=${stateMachine.sessionId} armed=${stateMachine.armed}"
             }
         }
@@ -511,13 +580,42 @@ class SkipAdService : AccessibilityService() {
         }
         isArmedFast = stateMachine.armed
         if (!isArmedFast) {
+            contentWindowRoot.clear()
             safeRecycle(root)
             return
         }
+        if (surface.ordinaryApplication && !surface.behindTopWindow) contentWindowRoot.remember(root)
+        else contentWindowRoot.clear()
+        val extractAt = SystemClock.uptimeMillis()
         NodeExtractor.extract(root, stateMachine.activeActivity, screenW, screenH, surface = surface).use { tree ->
+            val treeAt = SystemClock.uptimeMillis()
             val snapshot = tree.snapshot
+            if ((identity != tracedNotificationCandidate || tracedNotificationCandidateSession != stateMachine.sessionId) &&
+                evidenceLoggingEnabled() && snapshot.complete &&
+                snapshot.nodes.any { it.isVisibleToUser && it.shortId == "wm_splash_jump_tv" } &&
+                snapshot.nodes.any { it.shortId == "ll_notification" }) {
+                tracedNotificationCandidate = identity
+                tracedNotificationCandidateSession = stateMachine.sessionId
+                SkipTrace.log("accessibility") {
+                    "phase=creative candidate=notification_banner windowId=${identity.id}"
+                }
+            }
+            if ((identity != tracedNotificationWindow || tracedNotificationSession != stateMachine.sessionId) &&
+                evidenceLoggingEnabled() && snapshot.complete &&
+                snapshot.nodes.any { it.isVisibleToUser && it.shortId == "wm_splash_jump_tv" } &&
+                snapshot.nodes.any { it.isVisibleToUser && it.shortId == "wm_shake_click_region" }) {
+                tracedNotificationWindow = identity
+                tracedNotificationSession = stateMachine.sessionId
+                SkipTrace.log("accessibility") {
+                    val dismissAction = AccessibilityNodeInfo.AccessibilityAction.ACTION_DISMISS.id
+                    val dismissNodes = snapshot.nodes.filter { node -> node.isVisibleToUser &&
+                        tree.nodeAt(node.index)?.actionList?.any { it.id == dismissAction } == true }
+                        .joinToString(",") { it.index.toString() }
+                    "phase=creative type=notification_banner windowId=${identity.id} dismissNodes=${dismissNodes.ifEmpty { "-" }}"
+                }
+            }
             snapshot.freeform?.let { foregroundEvents.trackFloatingLaunch(stateMachine.sessionId, identity, it.captionId, SystemClock.uptimeMillis()) }
-            if (snapshot.complete && (snapshot.isFullScreen || snapshot.freeform != null) && root.hasOrdinaryWindow() &&
+            if (snapshot.complete && (snapshot.isFullScreen || snapshot.freeform != null) && surface.ordinaryApplication &&
                 !TargetEvidence.hasVisibleAdSignal(snapshot)
             ) {
                 foregroundEvents.rememberReturnWindow(identity)
@@ -535,6 +633,8 @@ class SkipAdService : AccessibilityService() {
                 SkipLog.log("SNAPSHOT nodes=${snapshot.nodes.size} saved=${file != null}")
             }
 
+            val matchStartedAt = SystemClock.uptimeMillis()
+            val matchStartCpu = SystemClock.currentThreadTimeMillis()
             val matchStart = SystemClock.elapsedRealtimeNanos()
             val evaluation = stateMachine.evaluateSnapshot(
                 snapshot, now, statsStore.masterEnabled, statsStore.observeOnly, statsStore.windowMs,
@@ -543,16 +643,28 @@ class SkipAdService : AccessibilityService() {
                 selfTestActivity = labActivity
             )
             val matchUs = (SystemClock.elapsedRealtimeNanos() - matchStart) / 1000L
+            val matchCpuMs = SystemClock.currentThreadTimeMillis() - matchStartCpu
+            if (!stateMachine.armed) {
+                isArmedFast = false
+                contentWindowRoot.clear()
+            }
             if (tracedScanSession != stateMachine.sessionId || evaluation != EvaluationResult.NoOp) {
                 tracedScanSession = stateMachine.sessionId
-                SkipTrace.log("legacy") {
+                SkipTrace.log("accessibility") {
                     "phase=match session=${stateMachine.sessionId} result=${evaluation.javaClass.simpleName} " +
                         "complete=${snapshot.complete} nodes=${snapshot.nodes.size} elapsedMs=${now - stateMachine.launchAtMs}"
                 }
             }
             when (evaluation) {
-                EvaluationResult.NoOp -> if (retry != null) cancelPendingRetry("target_unproven") else Unit
-                is EvaluationResult.OutOfWindow -> SkipLog.log("WINDOW_EXPIRED after=${evaluation.sinceLaunchMs}ms")
+                EvaluationResult.AwaitStableLayout -> scheduleRelayoutProbe()
+                EvaluationResult.NoOp -> if (retry != null) {
+                    if (retry.origin.waitsForStableLayout && stateMachine.armed) scheduleRelayoutProbe()
+                    else cancelPendingRetry("target_unproven")
+                } else Unit
+                is EvaluationResult.OutOfWindow -> {
+                    cancelPendingRetry("window_expired")
+                    SkipLog.log("WINDOW_EXPIRED after=${evaluation.sinceLaunchMs}ms")
+                }
                 is EvaluationResult.ObserveDetected -> {
                     stopStartupRecovery()
                     val decision = evaluation.decision
@@ -564,62 +676,92 @@ class SkipAdService : AccessibilityService() {
                     cancelWindowProbes()
                     val detectedAt = SystemClock.uptimeMillis()
                     val labTrace = if (pkg == packageName) TestSplashActivity.resumedTrace else null
-                    val evidence = TargetEvidence(snapshot, command.decision)
-                    val originEvent = source?.takeIf {
-                        it.windowId == tree.windowId && it.pkg == pkg && it.timestampMs in stateMachine.launchAtMs..detectedAt
+                    val evidence = TargetEvidence(snapshot, command.decision,
+                        allowBoundedMovement = true, followsVisibleAd = true)
+                    if (evidenceLoggingEnabled()) {
+                        windowTrace.recordActionSnapshot(command.sessionId, command.attemptId, detectedAt, snapshot)
                     }
-                    val originTime = retry?.eventAtMs ?: originEvent?.timestampMs
+                    val originEvent = retry?.event ?: source?.takeIf {
+                        it.windowId == tree.windowId && it.pkg == pkg &&
+                            it.timestampMs in stateMachine.launchAtMs..it.receivedAtMs && it.receivedAtMs <= workerAt
+                    }?.let { InputOrigin(it.timestampMs, it.receivedAtMs, it.windowId, "scan") } ?: geometry?.takeIf {
+                        it.windowId == tree.windowId && it.eventAtMs in stateMachine.launchAtMs..it.receivedAtMs &&
+                            it.receivedAtMs <= workerAt
+                    }
                     pendingRetry = null
+                    worker?.removeCallbacks(relayoutProbe)
                     val w = worker ?: return@use
                     val actionAt = SystemClock.uptimeMillis()
-                    var ownsAction = false
-                    val result = try {
-                        ActionExecutor.execute(
-                            service = this,
-                            tree = tree,
-                            command = command,
-                            screenWidth = screenW,
-                            screenHeight = screenH,
-                            callbackHandler = w,
-                            canDispatch = {
-                                epoch == workEpoch && canScan() && !statsStore.observeOnly &&
-                                    (command.retryTarget?.matchesWindow(pkg, tree.windowId) != false) &&
-                                    isSameForeground(tree, command.decision.targetBounds, screenW, screenH) && epoch == workEpoch && canScan() &&
-                                    stateMachine.isWithinWindow(SystemClock.uptimeMillis(), statsStore.windowMs) &&
-                                    (ownsAction || ExperimentalSkip.beginLegacy(pkg, tree.windowId).also { ownsAction = it })
-                            },
-                            onGestureOutcome = { sid, aid, completed ->
-                                val pending = pendingAttempt
-                                if (epoch == workEpoch && pending != null &&
-                                    pending.command.sessionId == sid && pending.command.attemptId == aid
-                                ) {
-                                    val callbackAt = SystemClock.uptimeMillis()
-                                    val gestureResult = if (completed) "GESTURE_OK" else "GESTURE_CANCELLED"
-                                    SkipLog.log("$gestureResult session=$sid attempt=$aid callbackAtMs=$callbackAt")
-                                    if (completed) {
-                                        pending.gestureCompletedAtMs = callbackAt
-                                        verificationRunnable.run()
-                                    } else {
-                                        completeAttempt(pending, VerifyOutcome.UNOBSERVED, "gesture_cancelled")
+                    var foregroundCheckMs = 0L
+                    var checkedByLayers = false
+                    var retrySnapshotInvalidated = false
+                    val result = ActionExecutor.execute(
+                        service = this,
+                        tree = tree,
+                        command = command,
+                        screenWidth = screenW,
+                        screenHeight = screenH,
+                        callbackHandler = w,
+                        canDispatch = { clickBounds ->
+                            epoch == workEpoch && canScan() && !statsStore.observeOnly &&
+                                (command.retryTarget?.matchesWindow(pkg, tree.windowId) != false) &&
+                                run {
+                                    val started = SystemClock.uptimeMillis()
+                                    val gestureRetry = clickBounds == null && retry?.origin?.followsVisibleAd == true
+                                    if (gestureRetry && !isFreshGestureRetry(treeAt, started, pendingForegroundSignal.get())) {
+                                        retrySnapshotInvalidated = true
+                                        return@run false
                                     }
+                                    val target = command.decision.targetBounds
+                                    checkedByLayers = clickBounds == null && appWindows.canDispatchFocusedGesture(
+                                        surface, tree.windowId, target, screenW, screenH
+                                    )
+                                    val allowed = checkedByLayers || isSameForeground(tree, target, clickBounds, screenW, screenH)
+                                    val checkedAt = SystemClock.uptimeMillis()
+                                    foregroundCheckMs += checkedAt - started
+                                    retrySnapshotInvalidated = allowed && gestureRetry &&
+                                        !isFreshGestureRetry(treeAt, checkedAt, pendingForegroundSignal.get())
+                                    allowed && !retrySnapshotInvalidated
+                                } &&
+                                epoch == workEpoch && canScan() && !statsStore.observeOnly &&
+                                stateMachine.isWithinWindow(SystemClock.uptimeMillis(), statsStore.windowMs)
+                        },
+                        onGestureOutcome = { sid, aid, completed ->
+                            val pending = pendingAttempt
+                            if (epoch == workEpoch && pending != null &&
+                                pending.command.sessionId == sid && pending.command.attemptId == aid
+                            ) {
+                                val callbackAt = SystemClock.uptimeMillis()
+                                val gestureResult = if (completed) "GESTURE_OK" else "GESTURE_CANCELLED"
+                                SkipLog.log("$gestureResult session=$sid attempt=$aid callbackAtMs=$callbackAt")
+                                if (completed) {
+                                    pending.gestureCompletedAtMs = callbackAt
+                                    verificationRunnable.run()
+                                } else {
+                                    pending.gestureCompletedAtMs = callbackAt
+                                    scheduleVerification(TARGET_RETRY_MS)
                                 }
                             }
-                        )
-                    } finally {
-                        if (ownsAction) ExperimentalSkip.endLegacy()
-                    }
-                    val refreshTarget = ActionExecutor.reacquisitionEvidence(result, tree, command)
+                        }
+                    )
+                    val refreshTarget = if (retrySnapshotInvalidated) {
+                        contentWindowRoot.clear()
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            runCatching { clearCache() }
+                        }
+                        retry?.origin
+                    } else ActionExecutor.reacquisitionEvidence(result, tree, command)
                     stateMachine.onActionDispatched(
                         command.sessionId, command.attemptId, result.actualMethod, result.dispatched, refreshTarget
                     )
-                    SkipTrace.log("legacy") {
+                    SkipTrace.log("accessibility") {
                         "phase=input session=${command.sessionId} attempt=${command.attemptId} " +
                             "accepted=${result.dispatched} reason=${result.rejectedBy ?: "-"}"
                     }
                     val pending = ObservedAttempt(
                         command, tree.windowId, evidence, result.actualMethod, detectedAt, actionAt,
                         result.inputStartedAtMs, result.inputReturnedAtMs,
-                        originTime, matchUs, labTrace,
+                        originEvent, matchUs, labTrace,
                         snapshot.freeform?.let { foregroundEvents.floatingDestination(command.sessionId, identity, it.captionId) }
                             ?: foregroundEvents.returnWindowFor(identity, result.inputStartedAtMs ?: actionAt)
                     )
@@ -629,6 +771,13 @@ class SkipAdService : AccessibilityService() {
                         "TARGET session=${command.sessionId} attempt=${command.attemptId} via=${decision.matchedVia} " +
                             "shake=${decision.isShakeAd} method=${result.actualMethod} dispatch=${result.dispatched} " +
                             "eventAtMs=${pending.eventAtMs ?: "-"} detectAtMs=$detectedAt actAtMs=$actionAt matchUs=$matchUs " +
+                            "matchCpuMs=$matchCpuMs " +
+                            "receivedAtMs=${originEvent?.receivedAtMs ?: "-"} originType=${originEvent?.type ?: "-"} " +
+                            "workerAtMs=$workerAt rootAtMs=$rootAt eventSourceRoot=${sourceRoot != null} " +
+                            "sourceAncestorSteps=${sourceRoot?.ancestorSteps ?: "-"} offeredSourceRoot=${source?.offeredSourceRoot == true} " +
+                            "surfaceAtMs=$surfaceAt extractAtMs=$extractAt treeAtMs=$treeAt matchStartedAtMs=$matchStartedAt " +
+                            "foregroundCheckMs=$foregroundCheckMs " +
+                            "foregroundLayersOnly=$checkedByLayers retrySnapshotInvalidated=$retrySnapshotInvalidated " +
                             "inputAtMs=${result.inputStartedAtMs ?: "-"} inputReturnAtMs=${result.inputReturnedAtMs ?: "-"} " +
                             "dispatchRejection=${result.rejectedBy ?: "-"}" +
                             (labTrace?.let { " ${it.fields} windowId=${tree.windowId}" } ?: "")
@@ -648,14 +797,18 @@ class SkipAdService : AccessibilityService() {
 
 
     private fun collectWindowStates(now: Long, labActivity: String): Boolean {
-        windowStates.entries.removeAll { now - it.value.timestampMs > WINDOW_STATE_MAX_AGE_MS }
+        windowStates.entries.removeAll { now - it.value.timestampMs > ForegroundEvents.DELAYED_ACTIVITY_HINT_MAX_AGE_MS }
         var seen = false
         while (true) {
             val state = pendingWindowStates.poll() ?: break
             val identity = ForegroundWindow(state.pkg, state.windowId)
-            if (now - state.timestampMs > WINDOW_STATE_MAX_AGE_MS || !identity.valid) continue
+            val age = now - state.timestampMs
+            if (!identity.valid || age !in 0..ForegroundEvents.DELAYED_ACTIVITY_HINT_MAX_AGE_MS) continue
+            if (age > WINDOW_STATE_MAX_AGE_MS && (
+                    !state.cls.startsWith("${state.pkg}.") || !state.cls.endsWith("Activity") ||
+                    PackagePolicy.isExcludedPackage(state.pkg) || PackagePolicy.isTransientOverlay(state.pkg, state.cls, true))) continue
             appWindows.state(identity, state.cls)
-            if (state.isFullScreen && !PackagePolicy.isTransientOverlay(state.pkg, "", false) &&
+            if (age <= WINDOW_STATE_MAX_AGE_MS && state.isFullScreen && !PackagePolicy.isTransientOverlay(state.pkg, "", false) &&
                 !PackagePolicy.isExcludedPackage(state.pkg)
             ) {
                 foregroundEvents.onResumeWindowHint(identity, state.timestampMs)
@@ -717,9 +870,11 @@ class SkipAdService : AccessibilityService() {
         val gestureCompletedAt = attempt.gestureCompletedAtMs
         if (attempt.method == ClickMethod.GESTURE && gestureCompletedAt == null) {
             val remaining = GESTURE_CALLBACK_TIMEOUT_MS - (now - inputReturnedAt)
-            if (remaining <= 0) completeAttempt(attempt, VerifyOutcome.UNOBSERVED, "gesture_completion_missing")
-            else scheduleVerification(remaining)
-            return
+            if (remaining > 0) {
+                scheduleVerification(remaining)
+                return
+            }
+            SkipTrace.log("accessibility") { "phase=gesture_callback result=missing attempt=${attempt.command.attemptId}" }
         }
         if (now - attempt.lastProbeMs < PROBE_INTERVAL_MS) return
         attempt.lastProbeMs = now
@@ -757,7 +912,7 @@ class SkipAdService : AccessibilityService() {
                 } else {
                     NodeExtractor.extract(root, "", width, height, maxNodes = MAX_VERIFY_NODES,
                         surface = appWindows.inspect(root, width, height, expectedUnmapped(now)),
-                        refreshDeadlineMs = if (cleared) null else now + LEGACY_FRESH_VERIFY_BUDGET_MS
+                        refreshDeadlineMs = if (cleared) null else now + FRESH_VERIFY_BUDGET_MS
                     ).use { attempt.evidence.observeReturn(it.snapshot) }
                 }
             } else {
@@ -817,15 +972,16 @@ class SkipAdService : AccessibilityService() {
             attempt.closure.record(observation, observedAt)
         }
 
-        val retryReady = attempt.method == ClickMethod.NODE_ACTION &&
-            observation == TargetObservation.TARGET_PRESENT && observedAt - inputReturnedAt >= NODE_RETRY_MS
+        val retryReady = observation == TargetObservation.TARGET_PRESENT &&
+            observedAt - observingSince >= TARGET_RETRY_MS
         if (retryReady) {
             completeAttempt(attempt, VerifyOutcome.STILL_PRESENT, "target_visible", attempt.evidence)
             return
         }
         if (observedAt - observingSince >= attempt.evidence.verifyTimeoutMs) {
             when (observation) {
-                TargetObservation.TARGET_PRESENT -> completeAttempt(attempt, VerifyOutcome.STILL_PRESENT, "target_visible")
+                TargetObservation.TARGET_PRESENT -> completeAttempt(attempt, VerifyOutcome.STILL_PRESENT,
+                    "target_visible", attempt.evidence)
                 TargetObservation.AD_PRESENT -> completeAttempt(attempt, VerifyOutcome.STILL_PRESENT, "ad_evidence_visible")
                 else -> completeAttempt(attempt, VerifyOutcome.UNOBSERVED, "absence_unconfirmed")
             }
@@ -850,7 +1006,7 @@ class SkipAdService : AccessibilityService() {
         return NodeExtractor.extract(
             root, stateMachine.activeActivity, screenW, screenH, maxNodes = MAX_VERIFY_NODES,
             surface = appWindows.inspect(root, screenW, screenH, expectedUnmapped(SystemClock.uptimeMillis())),
-            refreshDeadlineMs = if (cleared) null else SystemClock.uptimeMillis() + LEGACY_FRESH_VERIFY_BUDGET_MS
+            refreshDeadlineMs = if (cleared) null else SystemClock.uptimeMillis() + FRESH_VERIFY_BUDGET_MS
         ).use { attempt.evidence.observe(it.snapshot) }
     }
 
@@ -869,11 +1025,14 @@ class SkipAdService : AccessibilityService() {
         if (pendingAttempt !== attempt) return
         pendingAttempt = null
         worker?.removeCallbacks(verificationRunnable)
-        stateMachine.finishVerification(attempt.command.sessionId, attempt.command.attemptId, outcome, retryTarget)
+        val retryEvidence = retryTarget?.let {
+            attempt.command.retryTarget?.takeIf(TargetEvidence::followsVisibleAd) ?: it
+        }
+        stateMachine.finishVerification(attempt.command.sessionId, attempt.command.attemptId, outcome, retryEvidence)
         val at = SystemClock.uptimeMillis()
         val latencyMs = if (outcome == VerifyOutcome.VERIFIED_CLOSED) attempt.eventAtMs?.let { at - it } else null
         statsStore.recordOutcome(outcome, latencyMs)
-        SkipTrace.log("legacy") {
+        SkipTrace.log("accessibility") {
             "phase=verify session=${attempt.command.sessionId} attempt=${attempt.command.attemptId} " +
                 "result=$outcome reason=$reason elapsedMs=${at - attempt.actionAtMs}"
         }
@@ -887,19 +1046,29 @@ class SkipAdService : AccessibilityService() {
         )
         if (outcome == VerifyOutcome.VERIFIED_CLOSED) SkipSuccessFeedback.onVerifiedClosed(this)
         isArmedFast = stateMachine.armed
-        if (retryTarget != null && isArmedFast) {
-            pendingRetry = PendingRetry(attempt.command.sessionId, retryTarget, attempt.eventAtMs)
-            // The worker rechecks the original window before obtaining fresh nodes.
-            pendingContentScan.set(true)
-            scheduleDrain()
+        if (!isArmedFast) contentWindowRoot.clear()
+        if (retryEvidence != null && isArmedFast) {
+            pendingRetry = PendingRetry(attempt.command.sessionId, retryEvidence, attempt.event)
+            if (retryEvidence.waitsForStableLayout && !retryEvidence.followsVisibleAd) scheduleRelayoutProbe() else {
+                pendingContentScan.set(true)
+                scheduleDrain()
+            }
         }
+    }
+
+    private fun scheduleRelayoutProbe() {
+        val handler = worker ?: return
+        handler.removeCallbacks(relayoutProbe)
+        handler.postDelayed(relayoutProbe, RELAYOUT_PROBE_MS)
     }
 
     private fun cancelPendingRetry(reason: String) {
         val retry = pendingRetry ?: return
         pendingRetry = null
-        stateMachine.cancelGestureRetry()
+        worker?.removeCallbacks(relayoutProbe)
+        stateMachine.cancelRetry()
         isArmedFast = stateMachine.armed
+        if (!isArmedFast) contentWindowRoot.clear()
         SkipLog.log("RETRY_CANCEL session=${retry.sessionId} reason=$reason")
     }
 
@@ -908,15 +1077,17 @@ class SkipAdService : AccessibilityService() {
             foregroundEvents.floatingOrigin(stateMachine.sessionId) else null
 
     private fun activeApplicationRoot(
-        rootOnly: Boolean = inStartupRecovery()
+        rootOnly: Boolean = inStartupRecovery(),
+        prefetchForMatch: Boolean = false
     ): AccessibilityNodeInfo? {
         val start = SystemClock.uptimeMillis()
         val unmapped = expectedUnmapped(start)
         val root = try {
-            if (rootOnly && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                getRootInActiveWindow(0)
-            } else {
-                rootInActiveWindow
+            when {
+                prefetchForMatch && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU ->
+                    getRootInActiveWindow(MATCH_TREE_PREFETCH)
+                rootOnly && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> getRootInActiveWindow(0)
+                else -> rootInActiveWindow
             }
         } catch (_: Exception) {
             null
@@ -936,10 +1107,21 @@ class SkipAdService : AccessibilityService() {
                 @Suppress("DEPRECATION")
                 owner?.recycle()
             }
+            if (type == AccessibilityWindowInfo.TYPE_APPLICATION || type == -1) {
+                val bounds = Rect().also(root::getBoundsInScreen)
+                if (bounds.height() <= getScreenSize().second * .25f) {
+                    readBehindTopWindow(start)?.let { recovered ->
+                        safeRecycle(root)
+                        return recovered
+                    }
+                }
+            }
             if (usable) return root
             safeRecycle(root)
             if (type != null && type != -1 && type != AccessibilityWindowInfo.TYPE_APPLICATION) return null
             if (type == -1) return unmapped?.let { runCatching { windows.readFocusedUnmapped(it) }.getOrNull() }
+        } else {
+            readBehindTopWindow(start)?.let { return it }
         }
 
         // Recover missing active-root data only from the single active, focused app window.
@@ -966,6 +1148,18 @@ class SkipAdService : AccessibilityService() {
         return recovered
     }
 
+    private fun readBehindTopWindow(now: Long): AccessibilityNodeInfo? {
+        val expected = windowStates.values.asSequence()
+            .filter { now - it.timestampMs in 0..STACKED_WINDOW_STATE_MAX_AGE_MS }
+            .map { ForegroundWindow(it.pkg, it.windowId) }
+            .filter { !PackagePolicy.isExcludedPackage(it.packageName) && appWindows.verifiedActivity(it) != null }
+            .toCollection(LinkedHashSet())
+        if (pendingAttempt != null || stateMachine.armed && stateMachine.isWithinWindow(now, statsStore.windowMs)) {
+            foregroundEvents.verifiedWindow?.let(expected::add)
+        }
+        return appWindows.readBehindTopWindow(expected)
+    }
+
     private fun <T> withFocusedAppWindow(expectedId: Int?, read: (AccessibilityWindowInfo) -> T): T? {
         return try {
             windows.withFocusedAppWindow { focused ->
@@ -976,10 +1170,10 @@ class SkipAdService : AccessibilityService() {
         }
     }
 
-    private fun isSameForeground(tree: ExtractedTree, target: RectBounds, w: Int, h: Int): Boolean {
-        val root = activeApplicationRoot() ?: return false
+    private fun isSameForeground(tree: ExtractedTree, target: RectBounds, clickBounds: RectBounds?, w: Int, h: Int): Boolean {
+        val root = activeApplicationRoot(rootOnly = true) ?: return false
         return try {
-            appWindows.canDispatch(root, w, h, expectedUnmapped(SystemClock.uptimeMillis()), tree, target)
+            appWindows.canDispatch(root, w, h, expectedUnmapped(SystemClock.uptimeMillis()), tree, target, clickBounds)
         } finally {
             safeRecycle(root)
         }
@@ -1098,6 +1292,28 @@ class SkipAdService : AccessibilityService() {
 
     override fun onInterrupt() {}
 
+    override fun dump(fd: FileDescriptor, writer: PrintWriter, args: Array<out String>) {
+        val actionSnapshots = args.contains("--action-evidence")
+        if (!actionSnapshots && !args.contains("--window-evidence")) {
+            super.dump(fd, writer, args)
+            return
+        }
+        if (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE == 0 ||
+            activeService !== this || !canScan() || !isInteractiveAndUnlocked()) return
+        // ADB evidence capture must not enable rolling snapshots in the app's files.
+        val evidenceEnabled = evidenceLoggingEnabled()
+        if (actionSnapshots) {
+            if (evidenceEnabled) windowTrace.dumpActionSnapshots(writer)
+            return
+        }
+        if (!statsStore.diagNodes && !evidenceEnabled) return
+        val (width, height) = getScreenSize()
+        windowTrace.dumpEvidence(writer, width, height, windows)
+    }
+
+    private fun evidenceLoggingEnabled() =
+        applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0 && Log.isLoggable(EVIDENCE_TAG, Log.DEBUG)
+
     private fun resetPendingWork(reason: String) {
         val epoch = ++workEpoch
         isArmedFast = false
@@ -1107,11 +1323,14 @@ class SkipAdService : AccessibilityService() {
             cancelWindowProbes()
             handler.removeCallbacks(drainRunnable)
             handler.removeCallbacks(verificationRunnable)
+            handler.removeCallbacks(relayoutProbe)
             drainScheduled.set(false)
             pendingWindowCheck.set(false)
             pendingForegroundSignal.set(false)
             pendingContentScan.set(false)
             scanEvent.set(null)
+            geometryEvent.set(null)
+            contentWindowRoot.clear()
             pendingWindowStates.clear()
             appWindows.clear()
             windowStates.clear()

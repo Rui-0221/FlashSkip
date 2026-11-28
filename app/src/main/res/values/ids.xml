@@ -1,5 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <item name="lab_splash_jump" type="id" />
+    <item name="lab_splash_skip" type="id" />
+    <item name="lab_splash_skip_area" type="id" />
+    <item name="lab_splash_interaction_view" type="id" />
+    <item name="lab_shake_click_region" type="id" />
     <item name="tt_splash_skip" type="id" />
     <item name="replacement_skip" type="id" />
+    <item name="ad_container" type="id" />
+    <item name="ad_close_area" type="id" />
+    <item name="ad_close" type="id" />
+    <item name="ad_log" type="id" />
+    <item name="ad_icon" type="id" />
+    <item name="ksad_interstitial_native" type="id" />
+    <item name="ksad_interstitial_auto_close" type="id" />
+    <item name="ksad_auto_close_btn" type="id" />
+    <item name="ksad_logo_text" type="id" />
 </resources>

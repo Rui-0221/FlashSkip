@@ -178,12 +178,16 @@ class ForegroundEvents {
     fun acceptsStateHint(eventWindow: ForegroundWindow, root: ForegroundWindow?): Boolean =
         eventWindow.valid && eventWindow == root
 
+    fun acceptsDelayedActivityHint(eventWindow: ForegroundWindow, root: ForegroundWindow?, ageMs: Long): Boolean =
+        ageMs in 0..DELAYED_ACTIVITY_HINT_MAX_AGE_MS && root != verifiedWindow && acceptsStateHint(eventWindow, root)
+
     fun cancelWindowProbes() {
         windowSignal = null
         resumeSignal?.nextProbe = RESUME_PROBE_OFFSETS_MS.size
     }
 
     companion object {
+        const val DELAYED_ACTIVITY_HINT_MAX_AGE_MS = 2500L
         private const val PROBE_DEADLINE_MS = 160L
         private const val FOREGROUND_PROBE_DEADLINE_MS = 600L
         private const val CONTENT_CHECK_INTERVAL_MS = 200L

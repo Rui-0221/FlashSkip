@@ -6,6 +6,8 @@ import android.content.Intent
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.drawable.ColorDrawable
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -19,6 +21,10 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Button
 import android.widget.FrameLayout
+import android.widget.ImageButton
+import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.PopupWindow
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -75,6 +81,7 @@ class TestSplashActivity : AppCompatActivity() {
     private var trace: RunTrace? = null
     private var warmResumeCount = 0
     private var hotDialog: Dialog? = null
+    private var topBanner: PopupWindow? = null
 
     @SuppressLint("ClickableViewAccessibility")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -106,9 +113,20 @@ class TestSplashActivity : AppCompatActivity() {
             "id_only" -> setupIdOnly()
             "webview" -> setupWebView()
             "custom_view" -> setupCustomView()
+            "structured_interactive" -> setupStructuredClose(interactive = true)
+            "structured_interstitial", "structured_web_close", "structured_ks_interstitial", "neg_ad_card_decoy" ->
+                setupStructuredClose(interactive = false)
+            "neg_plain_step" -> {
+                tvAdTitle.contentDescription = null
+                setupNegativeButton("选择感兴趣的内容", "跳过")
+            }
             "countdown" -> setupAdButton("倒计时广告", "3 | 跳过")
             "fullscreen_overlay" -> setupFullScreenOverlay()
             "shake" -> setupAdButton("摇一摇查看详情", "跳过")
+            "stacked_banner", "stacked_countdown", "stacked_covered", "stacked_business" -> setupStackedCountdown()
+            "recorded_splash_relayout" -> setupRecordedSplashRelayout()
+            "recorded_skip_area_relayout" -> setupRecordedSplashRelayout(skipArea = true)
+            "recorded_promo_countdown" -> setupRecordedSplashRelayout(promotionalCountdown = true)
             "warm_resume" -> {
                 tvAdTitle.text = "回到前台后显示模拟开屏广告"
                 tvAdTitle.contentDescription = null
@@ -311,6 +329,7 @@ class TestSplashActivity : AppCompatActivity() {
     private fun closeSuccess(tag: String) {
         if (closed) return
         closed = true
+        topBanner?.dismiss()
         handler.removeCallbacksAndMessages(null)
         btnSkip.visibility = View.GONE
         tvFakeSkip.visibility = View.GONE
@@ -329,6 +348,173 @@ class TestSplashActivity : AppCompatActivity() {
         btnSkip.text = label
         btnSkip.setOnClickListener { action() }
         showTarget(btnSkip, delayMs)
+    }
+
+    private fun setupStackedCountdown() {
+        val business = scenario == "stacked_business"
+        val covered = scenario == "stacked_covered"
+        val compactBanner = scenario == "stacked_banner"
+        tvAdTitle.text = if (business) "普通业务页面" else "摇一摇查看详情"
+        if (business) tvAdTitle.contentDescription = null
+        btnBackManual.visibility = View.VISIBLE
+        val density = resources.displayMetrics.density
+        fun dp(value: Int) = (density * value).toInt()
+        val pill = LinearLayout(this).apply {
+            gravity = Gravity.CENTER
+            background = ColorDrawable(Color.DKGRAY)
+            for (part in listOf("4", " | ", "跳过")) {
+                addView(TextView(context).apply {
+                    text = part
+                    textSize = 16f
+                    setTextColor(Color.WHITE)
+                })
+            }
+            setOnClickListener {
+                if (business || covered) logTest("TEST_FAIL[$scenario] touched guarded control")
+                else closeSuccess(scenario)
+            }
+            visibility = View.GONE
+        }
+        splashRoot.post {
+            val bannerHeight = (splashRoot.height * if (compactBanner) .08f else .18f).toInt()
+            if (isFinishing || bannerHeight <= 0) return@post
+            val topFraction = when {
+                covered -> .08f
+                compactBanner -> .14f
+                else -> .28f
+            }
+            val top = (splashRoot.height * topFraction).toInt()
+            val right = if (compactBanner) dp(12) else (splashRoot.width * .26f).toInt() - dp(42)
+            splashRoot.addView(pill, FrameLayout.LayoutParams(dp(84), dp(34), Gravity.TOP or Gravity.RIGHT).apply {
+                topMargin = top
+                rightMargin = right.coerceAtLeast(0)
+            })
+            val banner = TextView(this).apply {
+                text = "通知预览　优惠速抢　刚刚"
+                textSize = 16f
+                gravity = Gravity.CENTER
+                setTextColor(Color.WHITE)
+                setBackgroundColor(Color.rgb(55, 58, 66))
+                setOnClickListener { logTest("TEST_FAIL[$scenario] touched banner") }
+            }
+            val inset = if (compactBanner) (splashRoot.width * .03f).toInt() else 0
+            val yOffset = if (compactBanner) (splashRoot.height * .02f).toInt() else 0
+            topBanner = PopupWindow(banner, splashRoot.width - inset * 2, bannerHeight, true).apply {
+                isOutsideTouchable = true
+                if (Build.VERSION.SDK_INT >= 29) setTouchModal(false)
+                showAtLocation(splashRoot, Gravity.TOP or Gravity.LEFT, inset, yOffset)
+            }
+            extraTarget = pill
+            showTarget(pill, delayMs = 1_250L)
+        }
+    }
+
+    private fun setupRecordedSplashRelayout(skipArea: Boolean = false, promotionalCountdown: Boolean = false) {
+        tvAdTitle.text = "同窗横幅与倒计时回放"
+        splashRoot.post {
+            if (isFinishing || splashRoot.width == 0 || splashRoot.height == 0) return@post
+            // Use the ratios of the traced 1200 × 2664 window so the lab can run in a floating task.
+            fun region(left: Int, top: Int, right: Int, bottom: Int): FrameLayout.LayoutParams {
+                val w = splashRoot.width
+                val h = splashRoot.height
+                return FrameLayout.LayoutParams((right - left) * w / 1200, (bottom - top) * h / 2664).apply {
+                    leftMargin = left * w / 1200
+                    topMargin = top * h / 2664
+                }
+            }
+            val creative = FrameLayout(this)
+            splashRoot.addView(creative, FrameLayout.LayoutParams(-1, -1))
+            val banner = LinearLayout(this).apply {
+                setBackgroundColor(Color.LTGRAY)
+                gravity = Gravity.END or Gravity.CENTER_VERTICAL
+                addView(TextView(context).apply { text = "刚刚" })
+                setOnClickListener { logTest("TEST_FAIL[$scenario] touched banner") }
+                visibility = View.INVISIBLE
+            }
+            creative.addView(banner, region(33, 153, 1167, 366))
+            val callToAction = TextView(this).apply {
+                text = "点击按钮了解更多"
+                gravity = Gravity.CENTER
+                setOnClickListener { logTest("TEST_FAIL[$scenario] touched ad call to action") }
+            }
+            if (promotionalCountdown) {
+                val interaction = FrameLayout(this).apply { id = R.id.lab_splash_interaction_view }
+                creative.addView(interaction, region(0, 1607, 1200, 2133))
+                callToAction.id = R.id.lab_shake_click_region
+                interaction.addView(callToAction, region(141, 348, 1058, 526))
+                btnBackManual.visibility = View.VISIBLE
+            } else {
+                creative.addView(callToAction, region(141, 1955, 1058, 2133))
+            }
+            val badge = if (skipArea) region(1040, 2313, 1161, 2352) else region(1075, 2283, 1153, 2336)
+            creative.addView(TextView(this).apply { text = "广告" }, badge)
+            val skip = TextView(this).apply {
+                id = if (skipArea) R.id.lab_splash_skip else R.id.lab_splash_jump
+                text = if (skipArea) "5s | 跳过" else "5 | 跳过"
+                gravity = Gravity.CENTER
+                setSingleLine()
+                setBackgroundColor(Color.DKGRAY)
+                setTextColor(Color.WHITE)
+                visibility = View.INVISIBLE
+                if (!skipArea) {
+                    setOnClickListener {
+                        if (promotionalCountdown) {
+                            logTest("TEST_FAIL[$scenario] clicked the promotional countdown")
+                        } else {
+                            creative.visibility = View.GONE
+                            closeSuccess(scenario)
+                        }
+                    }
+                    setOnTouchListener { _, event ->
+                        if (event.actionMasked == MotionEvent.ACTION_UP) {
+                            logTest("TEST_FAIL[$scenario] used a coordinate tap for a same-window banner")
+                        }
+                        true
+                    }
+                }
+            }
+            val area = if (skipArea) FrameLayout(this).apply {
+                id = R.id.lab_splash_skip_area
+                creative.addView(this, region(890, 0, 1200, 183))
+                addView(skip, region(39, 52, 271, 131))
+                isClickable = true
+                setOnTouchListener { _, event ->
+                    if (event.actionMasked == MotionEvent.ACTION_UP) {
+                        if (skip.visibility == View.VISIBLE && event.x >= skip.left && event.x < skip.right &&
+                            event.y >= skip.top && event.y < skip.bottom
+                        ) {
+                            creative.visibility = View.GONE
+                            closeSuccess(scenario)
+                        } else {
+                            logTest("TEST_FAIL[$scenario] touched empty skip area")
+                        }
+                    }
+                    true
+                }
+            } else null
+            if (area == null) {
+                val placement = if (promotionalCountdown) region(949, 399, 1168, 481) else region(1101, 157, 1167, 239)
+                creative.addView(skip, placement)
+            }
+            extraTarget = skip
+            showTarget(skip, 750)
+            handler.postDelayed({
+                if (area != null) {
+                    area.layoutParams = region(890, 121, 1200, 304)
+                    skip.text = "4s | 跳过"
+                } else {
+                    skip.layoutParams = region(949, 399, 1168, 481)
+                    skip.text = "4 | 跳过"
+                    banner.visibility = View.VISIBLE
+                }
+            }, 790)
+            if (promotionalCountdown) {
+                handler.postDelayed({
+                    banner.visibility = View.GONE
+                    skip.text = "2 | 跳过"
+                }, 1800)
+            }
+        }
     }
 
     private fun setupReplacementTarget() {
@@ -408,6 +594,96 @@ class TestSplashActivity : AppCompatActivity() {
         view.setOnClickListener { closeSuccess(scenario) }
         addExtraTarget(view, 54, 54)
         showTarget(view)
+    }
+
+    private fun setupStructuredClose(interactive: Boolean) {
+        val genuine = scenario != "neg_ad_card_decoy"
+        val web = scenario == "structured_web_close"
+        val sdkCard = scenario == "structured_ks_interstitial"
+        tvAdTitle.text = if (interactive) "互动创意靶场" else "弹窗关闭靶场"
+        tvAdTitle.contentDescription = null
+        btnBackManual.visibility = if (genuine) View.GONE else View.VISIBLE
+
+        splashRoot.post {
+            val width = splashRoot.width
+            val height = splashRoot.height
+            val cardWidth = if (interactive) width else (width * .84f).toInt()
+            val cardHeight = if (interactive) height else (height * .58f).toInt()
+            val closeSize = minOf((cardWidth * .10f).toInt(), (cardHeight * .09f).toInt())
+            val card = FrameLayout(this).apply {
+                if (sdkCard) id = R.id.ksad_interstitial_native
+                else if (!interactive && !web) id = R.id.ad_container
+                setBackgroundColor(Color.rgb(46, 65, 101))
+                setOnClickListener { logTest("TEST_FAIL[$scenario] creative body clicked") }
+            }
+            fun addControl(control: View, w: Int, h: Int, gravity: Int, margin: Int) {
+                card.addView(control, FrameLayout.LayoutParams(w, h, gravity).apply {
+                    topMargin = closeSize / 2
+                    marginEnd = margin
+                })
+            }
+            val corner = Gravity.TOP or Gravity.END
+            val close = when {
+                interactive || web -> createPaintedClose()
+                sdkCard -> ImageView(this).apply {
+                    id = R.id.ksad_auto_close_btn
+                    setImageResource(android.R.drawable.ic_menu_close_clear_cancel)
+                }
+                else -> ImageButton(this).apply {
+                    id = R.id.ad_close
+                    contentDescription = "关闭"
+                    setImageResource(android.R.drawable.ic_menu_close_clear_cancel)
+                }
+            }
+            close.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+            close.setOnClickListener {
+                if (genuine) closeSuccess(scenario)
+                else logTest("TEST_FAIL[$scenario] ordinary dialog close clicked")
+            }
+            if (interactive) {
+                val badge = TextView(this).apply {
+                    text = "互动广告"
+                    setTextColor(Color.WHITE)
+                    gravity = Gravity.CENTER
+                }
+                addControl(badge, 2 * closeSize, closeSize, corner, closeSize * 7 / 4)
+                addControl(close, closeSize, closeSize, corner, closeSize / 2)
+                card.addView(TextView(this).apply {
+                    text = "广告"
+                    setTextColor(Color.WHITE)
+                },
+                    FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.START))
+            } else {
+                val area = FrameLayout(this).apply {
+                    when {
+                        web -> contentDescription = "webview-close:abcdef:0:1"
+                        sdkCard -> id = R.id.ksad_interstitial_auto_close
+                        else -> id = R.id.ad_close_area
+                    }
+                }
+                area.addView(close, FrameLayout.LayoutParams(-1, -1))
+                addControl(area, closeSize, closeSize, corner, closeSize / 2)
+                addControl(TextView(this).apply {
+                    if (sdkCard) id = R.id.ksad_logo_text
+                    else if (genuine && !web) id = R.id.ad_log
+                    text = when {
+                        web || sdkCard -> "广告"
+                        genuine -> "广告标识"
+                        else -> "业务弹窗"
+                    }
+                    setTextColor(Color.WHITE)
+                }, 3 * closeSize, closeSize, Gravity.TOP or Gravity.START, 0)
+                card.addView(View(this).apply {
+                    id = R.id.ad_icon
+                    contentDescription = "图标"
+                    importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+                }, FrameLayout.LayoutParams(closeSize, closeSize, Gravity.CENTER))
+            }
+            card.visibility = View.GONE
+            extraTarget = card
+            splashRoot.addView(card, 0, FrameLayout.LayoutParams(cardWidth, cardHeight, Gravity.CENTER))
+            showTarget(card)
+        }
     }
 
     private fun createPaintedClose(renderOnly: Boolean = false): View {
@@ -528,6 +804,7 @@ class TestSplashActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        topBanner?.dismiss()
         logLifecycle("destroyed")
         hotDialog?.dismiss()
         handler.removeCallbacksAndMessages(null)

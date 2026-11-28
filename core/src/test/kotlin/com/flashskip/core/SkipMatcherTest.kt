@@ -79,6 +79,247 @@ class SkipMatcherTest {
     }
 
     @Test
+    fun `business search suggestion is excluded even when the page also has an ad badge`() {
+        val window = makeWindow(activity = "com.example.MainActivity", nodes = listOf(
+            node(0, bounds = fullScreen, depth = 0, clickable = false),
+            node(1, 0, text = "广告", bounds = RectBounds(15, 810, 80, 845)),
+            node(2, 0, bounds = RectBounds(0, 100, 1080, 500), className = "android.widget.GridView"),
+            node(3, 2, text = "跳过广告", bounds = topRight)
+        ))
+        assertNull(SkipMatcher.findBestMatch(window, ruleIndex))
+    }
+
+    @Test
+    fun `plain skip on a preference page never qualifies as a splash control`() {
+        val window = makeWindow(nodes = listOf(
+            node(0, bounds = fullScreen, depth = 0, clickable = false),
+            node(1, 0, text = "跳过", viewId = "id/tv_skip"),
+            node(2, 0, text = "选择感兴趣的内容", bounds = centerScreen, clickable = false)
+        ))
+        assertNull(SkipMatcher.findBestMatch(window, ruleIndex))
+    }
+
+    @Test
+    fun `shake call to action alone does not authorize an anonymous countdown label`() {
+        val window = makeWindow(activity = "com.example.MainActivity", nodes = listOf(
+            node(0, bounds = fullScreen, depth = 0, clickable = false),
+            node(1, 0, text = "4 | 跳过"),
+            node(2, 0, text = "摇一摇有惊喜", bounds = centerScreen, clickable = false)
+        ))
+        assertNull(SkipMatcher.findBestMatch(window, ruleIndex))
+    }
+
+    @Test
+    fun `displaced native countdown beside a promotion is excluded while an independent close can win`() {
+        val trapBounds = RectBounds(860, 370, 1040, 448)
+        val trap = node(4, 1, text = "5 | 跳过", viewId = "id/demo_splash_jump_tv", bounds = trapBounds)
+        val promoBounds = RectBounds(120, 1500, 950, 2030)
+        val window = makeWindow(nodes = listOf(
+            node(0, bounds = fullScreen, depth = 0, clickable = false),
+            node(1, 0, bounds = fullScreen, clickable = false),
+            node(2, 1, bounds = RectBounds(22, 145, 1058, 330), clickable = false),
+            node(3, 2, text = "刚刚", bounds = RectBounds(920, 160, 1030, 210), clickable = false),
+            trap,
+            node(5, 1, viewId = "id/demo_splash_interaction_view", bounds = promoBounds, clickable = false),
+            node(6, 5, viewId = "id/demo_shake_click_region", text = "点击按钮了解更多", bounds = promoBounds),
+            node(7, 1, text = "广告", bounds = RectBounds(18, 2050, 88, 2100), clickable = false)
+        ))
+        assertNull(SkipMatcher.findBestMatch(window, ruleIndex))
+        val afterBanner = window.copy(nodes = window.nodes.map {
+            if (it.index in 2..3) it.copy(isVisibleToUser = false, text = "") else it
+        })
+        assertNull(SkipMatcher.findBestMatch(afterBanner, ruleIndex))
+        val close = node(8, 1, desc = "Interstitial close button", bounds = RectBounds(12, 45, 78, 111),
+            className = "android.widget.ImageButton")
+        assertEquals(close.index, SkipMatcher.findBestMatch(window.copy(nodes = window.nodes + close), ruleIndex)?.targetNodeIndex)
+        val genuine = window.copy(nodes = window.nodes.map {
+            if (it.index == 6) it.copy(viewId = "", text = "") else it
+        })
+        assertEquals(trap.index, SkipMatcher.findBestMatch(genuine, ruleIndex)?.targetNodeIndex)
+    }
+
+    @Test
+    fun `anonymous header close requires an adjacent interactive ad label on the creative`() {
+        val badge = node(2, 1, text = "互动广告", bounds = RectBounds(700, 120, 840, 210), clickable = false)
+        val close = node(3, 1, bounds = topRight, className = "android.view.View")
+        val window = makeWindow(activity = "com.example.MainActivity", nodes = listOf(
+            node(0, bounds = fullScreen, depth = 0, clickable = false),
+            node(1, 0, bounds = fullScreen, clickable = false),
+            badge, close, node(4, 1, text = "广告", bounds = RectBounds(20, 2090, 70, 2130), clickable = false)
+        ))
+        val decision = SkipMatcher.findBestMatch(window, ruleIndex)
+        assertEquals(close.index, decision?.targetNodeIndex)
+        assertTrue(decision!!.nativeOnly)
+        assertNull(SkipMatcher.findBestMatch(window.copy(obstructions = listOf(topRight)), ruleIndex))
+        assertNull(SkipMatcher.findBestMatch(window.copy(nodes = window.nodes.map {
+            if (it == badge) it.copy(bounds = RectBounds(700, 280, 840, 370))
+            else if (it.index == 4) it.copy(text = "业务") else it
+        }), ruleIndex))
+    }
+
+    @Test
+    fun `named interstitial close resolves to the small native button within the ad card`() {
+        val card = RectBounds(140, 700, 940, 1900)
+        val closeBounds = RectBounds(850, 725, 915, 790)
+        val area = node(2, 1, viewId = "id/ad_close_area", bounds = closeBounds, clickable = false)
+        val close = node(3, 2, desc = "关闭", viewId = "id/ad_close", bounds = closeBounds,
+            className = "android.widget.ImageView")
+        val window = makeWindow(activity = "com.example.MainActivity", nodes = listOf(
+            node(0, bounds = fullScreen, depth = 0, clickable = false),
+            node(1, 0, viewId = "id/ad_container", bounds = card, clickable = false),
+            area, close,
+            node(4, 1, viewId = "id/ad_log", bounds = RectBounds(165, 735, 250, 772), clickable = false),
+            node(5, 1, viewId = "id/ad_icon", bounds = RectBounds(180, 1480, 260, 1560), clickable = false)
+        ))
+        val decision = SkipMatcher.findBestMatch(window, ruleIndex)
+        assertEquals(close.index, decision?.clickNodeIndex)
+        assertTrue(decision!!.nativeOnly)
+        assertNull(SkipMatcher.findBestMatch(window.copy(nodes = window.nodes.map {
+            if (it.index == 4) it.copy(viewId = "id/panel_logo") else it
+        }), ruleIndex))
+        assertNull(SkipMatcher.findBestMatch(window.copy(complete = false), ruleIndex))
+    }
+
+    @Test
+    fun `web ad close uses the native leaf on a stable layout even if the creative says shake`() {
+        val card = RectBounds(140, 700, 940, 1900)
+        val closeBounds = RectBounds(850, 725, 915, 790)
+        val window = makeWindow(activity = "com.example.MainActivity", nodes = listOf(
+            node(0, bounds = fullScreen, depth = 0, clickable = false),
+            node(1, 0, bounds = card, clickable = false),
+            node(2, 1, desc = "webview-close:abcdef:0:1", bounds = closeBounds, clickable = false),
+            node(3, 2, bounds = closeBounds, className = "android.view.View"),
+            node(4, 1, text = "广告", bounds = RectBounds(165, 735, 250, 772), clickable = false),
+            node(5, 1, text = "摇一摇", bounds = centerScreen, clickable = false)
+        )).copy(windowId = 3)
+        val machine = SkipStateMachine(ruleIndex)
+        machine.onWindowStateChanged(window.packageName, window.activityName, true, 1000L, windowId = 3,
+            confirmedFullscreenActivity = true, confirmedForegroundEntry = true)
+        assertEquals(EvaluationResult.AwaitStableLayout, machine.evaluateSnapshot(window, 1150L, true, false, 8000L))
+        val action = machine.evaluateSnapshot(window, 1240L, true, false, 8000L) as EvaluationResult.ExecuteClick
+        assertEquals(3, action.command.decision.clickNodeIndex)
+        assertEquals(ClickMethod.NODE_ACTION, action.command.preferredMethod)
+        assertFalse(action.command.allowImmediateGestureFallback)
+    }
+
+    @Test
+    fun `sdk interstitial close requires the registered card and its own ad badge`() {
+        val card = RectBounds(0, 750, 1080, 1780)
+        val closeBounds = RectBounds(965, 750, 1045, 830)
+        val window = makeWindow(activity = "com.example.MainActivity", nodes = listOf(
+            node(0, bounds = fullScreen, depth = 0, clickable = false),
+            node(1, 0, viewId = "id/ksad_interstitial_native", bounds = card, clickable = false),
+            node(2, 1, viewId = "id/ksad_interstitial_auto_close", bounds = closeBounds, clickable = false),
+            node(3, 2, viewId = "id/ksad_auto_close_btn", bounds = closeBounds, className = "android.widget.ImageView"),
+            node(4, 1, viewId = "id/ksad_logo_text", text = "广告", bounds = RectBounds(30, 1500, 75, 1530))
+        ))
+        assertEquals(3, SkipMatcher.findBestMatch(window, ruleIndex)?.clickNodeIndex)
+        assertNull(SkipMatcher.findBestMatch(window.copy(nodes = window.nodes.map {
+            if (it.index == 4) it.copy(parentIndex = 0) else it
+        }), ruleIndex))
+    }
+
+    @Test
+    fun `web close id requires feedback and an ad label in the same card`() {
+        val card = RectBounds(110, 410, 970, 2080)
+        val window = makeWindow(activity = "com.example.MainActivity", nodes = listOf(
+            node(0, bounds = fullScreen, depth = 0, clickable = false),
+            node(1, 0, bounds = fullScreen, className = "android.webkit.WebView", clickable = false),
+            node(2, 1, bounds = card, viewId = "ad_area", clickable = false),
+            node(3, 2, bounds = RectBounds(885, 430, 940, 485), viewId = "close_btn", text = "×"),
+            node(4, 2, bounds = RectBounds(135, 430, 220, 485), text = "反馈"),
+            node(5, 2, bounds = RectBounds(860, 1990, 925, 2035), text = "广告", clickable = false)
+        ))
+        assertEquals(3, SkipMatcher.findBestMatch(window, ruleIndex)?.clickNodeIndex)
+        assertNull(SkipMatcher.findBestMatch(window.copy(nodes = window.nodes.map {
+            if (it.index == 5) it.copy(parentIndex = 1) else it
+        }), ruleIndex))
+    }
+
+    @Test
+    fun `portrait sdk end card exposes a top corner close separate from the creative`() {
+        val window = makeWindow(activity = "com.example.PortraitADActivity", nodes = listOf(
+            node(0, bounds = fullScreen, depth = 0, clickable = false),
+            node(1, 0, bounds = fullScreen, clickable = false),
+            node(2, 1, bounds = fullScreen, className = "android.webkit.WebView", clickable = false),
+            node(3, 1, className = "android.widget.ImageView"),
+            node(4, 2, bounds = fullScreen, className = "android.webkit.WebView", clickable = false,
+                text = "优量汇-插屏视频endcard")
+        ))
+        assertEquals(3, SkipMatcher.findBestMatch(window, ruleIndex)?.clickNodeIndex)
+        assertNull(SkipMatcher.findBestMatch(window.copy(activityName = "com.example.MainActivity"), ruleIndex))
+    }
+
+    @Test
+    fun `reward creative closes only through an unambiguous image opposite ad feedback`() {
+        val close = node(2, 1, bounds = RectBounds(940, 650, 1010, 720), className = "android.widget.ImageView")
+        val window = makeWindow(activity = "com.example.MobRewardVideoActivity", nodes = listOf(
+            node(0, bounds = fullScreen, depth = 0, clickable = false),
+            node(1, 0, bounds = fullScreen, clickable = false), close,
+            node(3, 1, bounds = RectBounds(130, 755, 250, 810), text = "反馈")
+        ))
+        assertEquals(close.index, SkipMatcher.findBestMatch(window, ruleIndex)?.clickNodeIndex)
+        assertNull(SkipMatcher.findBestMatch(window.copy(nodes = window.nodes.dropLast(1)), ruleIndex))
+        assertNull(SkipMatcher.findBestMatch(window.copy(nodes = window.nodes +
+            close.copy(index = 4, bounds = RectBounds(875, 650, 945, 720))), ruleIndex))
+    }
+
+    @Test
+    fun `custom skip description requires the promotional image to share the creative without overlap`() {
+        val image = node(2, 1, desc = "上滑或点击查看详情", bounds = RectBounds(180, 0, 835, 2400),
+            className = "android.widget.ImageView")
+        val window = makeWindow(activity = "com.example.MainActivity", nodes = listOf(
+            node(0, bounds = fullScreen, depth = 0, clickable = false),
+            node(1, 0, bounds = fullScreen, clickable = false), image,
+            node(3, 1, desc = "跳过", className = "android.view.View")
+        ))
+        assertEquals(3, SkipMatcher.findBestMatch(window, ruleIndex)?.targetNodeIndex)
+        assertNull(SkipMatcher.findBestMatch(window.copy(nodes = window.nodes.map {
+            if (it == image) it.copy(bounds = fullScreen) else it
+        }), ruleIndex))
+    }
+
+    @Test
+    fun `split countdown below a banner needs a separate ad marker`() {
+        val root = node(0, bounds = fullScreen, depth = 0, clickable = false)
+        val marker = node(1, 0, text = "摇一摇查看详情", bounds = centerScreen)
+        val pill = node(2, 0, bounds = RectBounds(720, 680, 865, 750))
+        val timer = node(3, 2, text = "4", bounds = RectBounds(720, 680, 745, 750))
+        val separator = node(4, 2, text = "|", bounds = RectBounds(745, 680, 770, 750))
+        val skip = node(5, 2, text = "跳过", bounds = RectBounds(770, 680, 865, 750), clickable = false)
+        val window = makeWindow(nodes = listOf(root, marker, pill, timer, separator, skip)).copy(
+            windowId = 7, behindTopWindow = true, obstructions = listOf(RectBounds(0, 0, 1080, 420))
+        )
+        val match = SkipMatcher.findBestMatch(window, ruleIndex)
+        assertEquals(skip.index, match?.targetNodeIndex)
+        assertTrue(match!!.forceGestureOnly)
+        assertNull(SkipMatcher.findBestMatch(window.copy(nodes = window.nodes.map {
+            if (it == marker) marker.copy(text = "普通业务") else it
+        }), ruleIndex))
+        assertNull(SkipMatcher.findBestMatch(window.copy(nodes = window.nodes.map {
+            if (it == separator) separator.copy(text = "授权") else it
+        }), ruleIndex))
+        assertNull(SkipMatcher.findBestMatch(window.copy(complete = false), ruleIndex))
+    }
+
+    @Test
+    fun `banner coverage is checked on physical bounds after freeform scaling`() {
+        val frame = RectBounds(200, 400, 740, 1600)
+        val viewport = FreeformViewport(frame, RectBounds(200, 400, 1280, 2800), 4,
+            RectBounds(200, 400, 740, 460), emptyList())
+        val marker = node(1, 0, desc = "广告", bounds = centerScreen)
+        val skip = node(2, 0, text = "4 | 跳过", bounds = RectBounds(745, 680, 885, 750))
+        val window = makeWindow(nodes = listOf(node(0, bounds = fullScreen, depth = 0), marker, skip)).copy(
+            freeform = viewport, windowId = 7, behindTopWindow = true,
+            obstructions = listOf(RectBounds(210, 420, 730, 650))
+        )
+        assertEquals(skip.index, SkipMatcher.findBestMatch(window, ruleIndex)?.targetNodeIndex)
+        assertNull(SkipMatcher.findBestMatch(window.copy(obstructions = listOf(RectBounds(570, 690, 580, 775))), ruleIndex))
+        assertNull(SkipMatcher.findBestMatch(window.copy(nodes = listOf(window.nodes[0], marker,
+            skip.copy(bounds = RectBounds(450, 680, 590, 750)))), ruleIndex))
+    }
+
+    @Test
     fun `empty string text does not mask contentDescription`() {
         val win = makeWindow(
             nodes = listOf(
